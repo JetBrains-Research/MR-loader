@@ -30,17 +30,17 @@ suspend fun loadGerrit() {
   val dateFormat = ClientUtil.getDateFormatterGetter()
 
 //  "yyyy-MM-dd HH:mm:ss.SSSSSSSSS"
-//  val beforeThreshold = dateFormat.parse("2022-10-21 23:59:00.000000000")
-//  val afterThreshold = dateFormat.parse("2022-09-30 23:59:00.000000000")
+  val beforeThreshold = dateFormat.parse("2022-10-21 23:59:00.000000000")
+  val afterThreshold = dateFormat.parse("2022-09-30 23:59:00.000000000")
 
   val path = System.getProperty("user.home") + File.separator + "work"
   val dir = File(path)
-  val dataDir = File(dir, "check_openstack")
+  val dataDir = File(dir, "__openstack")
   val url = "http://review.openstack.org"
   val patchsetCommentKey = "/PATCHSET_LEVEL"
-  val extractorChangesSingleLoad =
+  val extractorChanges =
     ExtractorChanges(url, dataDir, patchsetCommentKey = patchsetCommentKey)
-  extractorChangesSingleLoad.run()
+  extractorChanges.run(beforeThreshold = beforeThreshold, afterThreshold = afterThreshold)
 
   val resultsDir = File(dataDir, LoaderChanges.baseUrlToDomain(url))
   check(resultsDir)
