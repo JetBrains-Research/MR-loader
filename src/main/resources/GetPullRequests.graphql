@@ -1,0 +1,195 @@
+#fragment actorLoginEmail on Actor {
+#    __typename
+#    login
+#    ... on Bot {
+#        login
+#    }
+#    ... on EnterpriseUserAccount {
+#        login
+#        user {
+#            name
+#            login
+#            email
+#        }
+#    }
+#    ... on Mannequin {
+#        login
+#        email
+#    }
+#    ... on Organization {
+#        name
+#        login
+#        email
+#    }
+#    ... on User {
+#        name
+#        login
+#        email
+#    }
+#}
+
+query GetPullRequests(
+    $owner: String!,
+    $repoName: String!,
+    $lastPR: Int!,
+    $firstReviewThreads: Int!,
+    $firstReviews: Int!,
+    $beforePR: String,
+    $afterReviewThreads: String,
+    $afterReviews: String,
+    $firstReviewThreadComments: Int!,
+    $firstCommits: Int!,
+) {
+    rateLimit {
+        limit
+        cost
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $repoName) {
+        pullRequests(last: $lastPR, before: $beforePR) {
+            totalCount
+            edges {
+                cursor
+                node {
+                    state
+                    baseRefName
+                    baseRef {
+                        id
+                    }
+
+                    headRefName
+                    headRef {
+                        id
+                    }
+                    author {
+                        __typename
+                        login
+                        ... on Bot {
+                            login
+                        }
+                        ... on EnterpriseUserAccount {
+                            login
+                            user {
+                                name
+                                login
+                                email
+                            }
+                        }
+                        ... on Mannequin {
+                            login
+                            email
+                        }
+                        ... on Organization {
+                            name
+                            login
+                            email
+                        }
+                        ... on User {
+                            name
+                            login
+                            email
+                        }
+                    }
+                    url
+                    createdAt
+                    closedAt
+                    number
+                    reviewThreads(first: $firstReviewThreads, after: $afterReviewThreads) {
+                        totalCount
+                        edges{
+                            cursor
+                            node{
+                                comments(first: $firstReviewThreadComments) {
+                                    totalCount
+                                    nodes {
+                                        author {
+                                            __typename
+                                            login
+                                            ... on Bot {
+                                                login
+                                            }
+                                            ... on EnterpriseUserAccount {
+                                                login
+                                                user {
+                                                    name
+                                                    login
+                                                    email
+                                                }
+                                            }
+                                            ... on Mannequin {
+                                                login
+                                                email
+                                            }
+                                            ... on Organization {
+                                                name
+                                                login
+                                                email
+                                            }
+                                            ... on User {
+                                                name
+                                                login
+                                                email
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    reviews(first: $firstReviews, after: $afterReviews) {
+                        totalCount
+                        edges {
+                            cursor
+                            node {
+                                author {
+                                    __typename
+                                    login
+                                    ... on Bot {
+                                        login
+                                    }
+                                    ... on EnterpriseUserAccount {
+                                        login
+                                        user {
+                                            name
+                                            login
+                                            email
+                                        }
+                                    }
+                                    ... on Mannequin {
+                                        login
+                                        email
+                                    }
+                                    ... on Organization {
+                                        name
+                                        login
+                                        email
+                                    }
+                                    ... on User {
+                                        name
+                                        login
+                                        email
+                                    }
+                                }
+                            }
+                        }
+
+                    }
+
+                    commits(first: $firstCommits) {
+                        totalCount
+                        edges{
+                            cursor
+                            node{
+                                commit {
+                                    oid
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

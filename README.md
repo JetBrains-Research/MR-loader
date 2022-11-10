@@ -1,31 +1,15 @@
-# tnm/github-pr-extraction
+# MR-loader
 
+## How to use
 
+1. Enter your GitHub token into gradle.properties
+2. Run `./gradlew run` or hit green triangle in IDEA in Main.kt
 
-## Getting Started
+## Examples
 
-Download links:
+Gerrit and GitHub examples inside `Main.kt`
 
-SSH clone URL: ssh://git@git.jetbrains.team/tnm/github-pr-extraction.git
+## Notes
 
-HTTPS clone URL: https://git.jetbrains.team/tnm/github-pr-extraction.git
-
-
-
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
-
-## Prerequisites
-
-What things you need to install the software and how to install them.
-
-```
-Examples
-```
-
-## Deployment
-
-Add additional notes about how to deploy this on a production system.
-
-## Resources
-
-Add links to external resources for this project, such as CI server, bug tracker, etc.
+Run task generates a properties file in build, then GithubLoader can use it
+via resources as default token for downloading.
