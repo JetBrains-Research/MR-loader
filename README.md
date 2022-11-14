@@ -1,9 +1,11 @@
 # MR-loader
 
+At the moment tool is shared "as it is" and will be reworked as CLI tool. 
+
 ## How to use
 
 1. Enter your GitHub token into gradle.properties
-2. Run `./gradlew run` or hit green triangle in IDEA in Main.kt
+2. Run `./gradlew run`
 
 ## Examples
 
