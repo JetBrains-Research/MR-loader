@@ -19,7 +19,6 @@ dependencies {
   implementation("io.ktor:ktor-client-core:$ktorVersion")
   implementation("io.ktor:ktor-client-apache:$ktorVersion")
 
-  implementation("com.expediagroup:graphql-kotlin-ktor-client:5.3.2")
   implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
 
   testImplementation(kotlin("test"))
