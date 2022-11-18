@@ -14,8 +14,13 @@ import java.util.*
 class ExtractorChanges(
   val baseUrl: String,
   val resultDir: File? = null,
-  val patchsetCommentKey: String = "/PATCHSET_LEVEL"
+  val patchsetCommentKey: String = DEFAULT_PATCHSET_COMMENT_KEY
 ) {
+
+  companion object {
+    const val DEFAULT_PATCHSET_COMMENT_KEY = "/PATCHSET_LEVEL"
+  }
+
   private val resultsFolder = run {
     val folder = baseUrlToDomain(baseUrl)
     if (resultDir == null) File("./dataset/gerrit/$folder") else File(resultDir, "dataset/$folder")

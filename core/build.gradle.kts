@@ -5,8 +5,8 @@ import java.util.*
 
 
 plugins {
-  kotlin("jvm") version "1.6.10"
-  kotlin("plugin.serialization") version "1.6.10"
+  kotlin("jvm")
+  kotlin("plugin.serialization")
   id("com.expediagroup.graphql") version "5.3.2"
   application
 }

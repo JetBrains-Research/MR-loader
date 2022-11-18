@@ -10,7 +10,7 @@ build
 counts
 batches
 _batches
-src/main/resources/schema.docs.graphql
+core/src/main/resources/schema.docs.graphql
 /token
 results
 restResponse
