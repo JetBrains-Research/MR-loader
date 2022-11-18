@@ -1,30 +1,11 @@
 import client.ClientGerritREST
 import client.ClientUtil
-import entity.rest.github.GithubRepositoryInfo
 import extractor.ExtractorUtil
 import extractor.gerrit.ExtractorChanges
-import extractor.github.ExtractorPR
 import loader.gerrit.LoaderChanges
 import java.io.File
 import java.util.*
 
-
-suspend fun loadGithub() {
-  val reposInfos = listOf(
-    GithubRepositoryInfo("apache", "beam") to null,
-    GithubRepositoryInfo("apache", "flink") to null,
-    GithubRepositoryInfo("apache", "kafka") to "refs/remotes/origin/trunk",
-    GithubRepositoryInfo("apache", "spark") to null,
-    GithubRepositoryInfo("apache", "zookeeper") to null,
-  )
-
-  val dateFormat = ClientUtil.getDateFormatterGithub()
-  val upTo = dateFormat.parse("2020-09-02T00:00:00Z")
-  for ((githubRepositoryInfo, branchName) in reposInfos) {
-    val extractorPR = ExtractorPR(githubRepositoryInfo)
-    extractorPR.run(upTo = upTo, branchName = branchName)
-  }
-}
 
 suspend fun loadGerrit() {
   val dateFormat = ClientUtil.getDateFormatterGetter()
@@ -103,9 +84,5 @@ fun check(resultsDir: File) {
 }
 
 suspend fun main() {
-//  loadGithub()
   loadGerrit()
-//  checkSlowLoad()
-//  checkLoadedSingleChangeMod()
-//  checkLoadedLight()
 }
