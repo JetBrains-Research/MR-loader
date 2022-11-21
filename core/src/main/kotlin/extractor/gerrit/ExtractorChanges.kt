@@ -75,6 +75,8 @@ class ExtractorChanges(
 
   private fun changesFile(project: String) = resultFile("changes", project)
 
+  private fun String.addBackslashes() = this.replace("\n", "\\n").replace("\"", "\"\"")
+
   private fun addLineChanges(changeGerrit: ChangeGerrit) {
     val project = changeGerrit.project
     val file = changesFile(project)
@@ -84,12 +86,14 @@ class ExtractorChanges(
     changeGerrit.revisions.values.forEach { if (it.footer != null) comments.add(it.footer) }
 
     val comment = when {
-      comments.size == 1 -> comments.first().replace("\n", "\\n").replace("\"", "\"\"")
+      comments.size == 1 -> comments.first().addBackslashes()
       comments.size > 1 -> throw Exception("Gerrit change (id: ${changeGerrit.id}) contains more than one footers in revisions.")
       else -> {
         ""
       }
     }
+
+    val subject = changeGerrit.subject.addBackslashes()
 
     writer.addLineCSV(
       changeGerrit.created,
@@ -99,7 +103,7 @@ class ExtractorChanges(
       "\"$comment\"",
       changeGerrit.keyChange,
       changeGerrit.updated,
-      "\"${changeGerrit.subject}\""
+      "\"$subject\""
     )
   }
 
