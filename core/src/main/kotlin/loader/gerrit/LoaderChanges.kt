@@ -209,6 +209,7 @@ class LoaderChanges(
     if (stateOfLoad.finishedLoadingIds && !ignoreState) return
 
     val projects = client.getProjects(baseUrl)
+    logger.info("Number of projects: ${projects.size}")
     val jsonObjectsListBuffer = JsonObjectsListBuffer(lightChangesDir)
 
     for (project in projects) {
@@ -220,21 +221,32 @@ class LoaderChanges(
         val rawJson =
           getChangesWrapped(project, before = before, light = true)
         val metaData = decodeChangesMetaData(rawJson)
-        logger.info("Loaded changes before=$before; size=${metaData.size}")
 
-        if (metaData.isNotEmpty()) {
-          jsonObjectsListBuffer.addObject(rawJson)
-          val lastChange = metaData.last()
-          if (afterThreshold != null) {
-            val lastDate = dateFormatter.parse(lastChange.updated)
-            if (lastDate <= afterThreshold) break
-          }
-          before = lastChange.updated
-          moreChanges = lastChange.moreChanges ?: false
-        } else {
-          logger.warning("Got empty list of changes before=$before;")
+        if (metaData.isEmpty()) {
+          logger.warning("Got empty list of changes for project=$project; before=$before;")
           break
         }
+
+        val lastChange = metaData.last()
+        if (afterThreshold != null) {
+          val lastDate = dateFormatter.parse(lastChange.updated)
+          if (lastDate <= afterThreshold) {
+            val firstChange = metaData.first()
+            val firstDate = dateFormatter.parse(firstChange.updated)
+            if (firstDate <= afterThreshold) {
+              logger.info("Skipping load for project=$project; before=$before; size=${metaData.size}; not in threshold firstDate=$firstDate; lastDate=$lastDate")
+              break
+            }
+            jsonObjectsListBuffer.addObject(rawJson)
+            logger.info("Loaded changes for project=$project; firstDate=$firstDate; lastDate=$lastDate size=${metaData.size};")
+            break
+          }
+        }
+        jsonObjectsListBuffer.addObject(rawJson)
+        before = lastChange.updated
+        moreChanges = lastChange.moreChanges ?: false
+
+        logger.info("Loaded changes for project=$project; before=$before; size=${metaData.size}; moreChanges=$moreChanges")
       }
     }
 
@@ -294,6 +306,11 @@ class LoaderChanges(
           continue
         }
 
+        if (!changeInThresholds(metaData)) {
+          logger.info("Change $id not in thresholds. Skipping.")
+          continue
+        }
+
         val callable = Callable {
           runBlocking {
             wrapIgnoringErrors { client.getChangeRaw(baseUrl, id) }?.let { rawJson ->
@@ -308,6 +325,18 @@ class LoaderChanges(
       count++
     }
     logger.info("Added $count change loading tasks.")
+  }
+
+  private fun changeInThresholds(change: ChangeMetaData): Boolean {
+    var result = true
+    val date = dateFormatter.parse(change.updated)
+    beforeThreshold?.let {
+      if (date >= it) result = false
+    }
+    afterThreshold?.let {
+      if (date <= it) result = false
+    }
+    return result
   }
 
   // TODO: rewrite it, to sorted order comments loading with mutable maps inside. In this case there will be max 2 maps.
