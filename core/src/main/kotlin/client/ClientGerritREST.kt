@@ -63,6 +63,32 @@ class ClientGerritREST {
   suspend fun getChangesRawLight(baseUrl: String, before: String? = null, after: String? = null, nChanges: Int = 300) =
     requestRaw("$baseUrl/changes/?${timeGap(before, after)}&n=$nChanges")
 
+  suspend fun getChangesRawLightNew(baseUrl: String, offset: Int) =
+    requestRaw("$baseUrl/changes/?S=$offset")
+
+  suspend fun getChangesRawLightWithProject(
+    baseUrl: String,
+    project: String,
+    before: String? = null,
+    after: String? = null,
+    nChanges: Int = 300
+  ) =
+    requestRaw("$baseUrl/changes/?${timeGapProject(project, before, after)}&n=$nChanges")
+
+  suspend fun getProjects(baseUrl: String) =
+    request<Map<String, ProjectGerrit>>("$baseUrl/projects/").keys
+
+  private fun timeGapProject(project: String, before: String? = null, after: String? = null): String {
+    var result = "q=project:$project+"
+    before?.let {
+      result += "+before:$before"
+    }
+    after?.let {
+      result += "+after:$after"
+    }
+    return result
+  }
+
   suspend fun getChangeRaw(baseUrl: String, number: Int) =
     requestRaw("$baseUrl/changes/$number/?&o=$CHANGES_PARAMETERS")
 

@@ -34,8 +34,13 @@ class LoaderChanges(
   val afterThreshold: Date? = null,
   val ignoreState: Boolean = false
 ) {
+
   companion object {
     const val TIMEOUT = 500L
+
+    // TODO: needs check
+    private val IGNORE_PROJECTS = setOf("All-Projects", "All-Users")
+
     fun baseUrlToDomain(baseUrl: String) = baseUrl
       .removePrefix("http://")
       .removePrefix("https://")
@@ -203,30 +208,36 @@ class LoaderChanges(
   private suspend fun loadNeededIds() {
     if (stateOfLoad.finishedLoadingIds && !ignoreState) return
 
-    var moreChanges = true
-    var before = beforeThreshold?.let { dateFormatter.format(beforeThreshold) }
+    val projects = client.getProjects(baseUrl)
     val jsonObjectsListBuffer = JsonObjectsListBuffer(lightChangesDir)
-    while (moreChanges) {
-      Thread.sleep(TIMEOUT)
-      val rawJson =
-        getChangesWrapped(before = before, light = true)
-      val metaData = decodeChangesMetaData(rawJson)
-      logger.info("Loaded changes before=$before; size=${metaData.size}")
 
-      if (metaData.isNotEmpty()) {
-        jsonObjectsListBuffer.addObject(rawJson)
-        val lastChange = metaData.last()
-        if (afterThreshold != null) {
-          val lastDate = dateFormatter.parse(lastChange.updated)
-          if (lastDate <= afterThreshold) break
+    for (project in projects) {
+      if (project in IGNORE_PROJECTS) continue
+      var moreChanges = true
+      var before = beforeThreshold?.let { dateFormatter.format(beforeThreshold) }
+      while (moreChanges) {
+        Thread.sleep(TIMEOUT)
+        val rawJson =
+          getChangesWrapped(project, before = before, light = true)
+        val metaData = decodeChangesMetaData(rawJson)
+        logger.info("Loaded changes before=$before; size=${metaData.size}")
+
+        if (metaData.isNotEmpty()) {
+          jsonObjectsListBuffer.addObject(rawJson)
+          val lastChange = metaData.last()
+          if (afterThreshold != null) {
+            val lastDate = dateFormatter.parse(lastChange.updated)
+            if (lastDate <= afterThreshold) break
+          }
+          before = lastChange.updated
+          moreChanges = lastChange.moreChanges ?: false
+        } else {
+          logger.warning("Got empty list of changes before=$before;")
+          break
         }
-        before = lastChange.updated
-        moreChanges = lastChange.moreChanges ?: false
-      } else {
-        logger.warning("Got empty list of changes before=$before;")
-        break
       }
     }
+
     jsonObjectsListBuffer.close()
     stateOfLoad.finishedLoadingIds = true
     saveState()
@@ -362,6 +373,7 @@ class LoaderChanges(
 
   //TODO: Refactor
   private suspend fun getChangesWrapped(
+    project: String,
     before: String? = null,
     after: String? = null,
     maxNumOfErrors: Int = 5,
@@ -377,7 +389,7 @@ class LoaderChanges(
           before,
           after,
           nChanges
-        ) else client.getChangesRawLight(baseUrl, before, after, nChanges)
+        ) else client.getChangesRawLightWithProject(baseUrl, project, before, after, nChanges)
       } catch (e: Throwable) {
 
         if (e.message?.contains("408") == true) {
