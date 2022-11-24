@@ -29,6 +29,14 @@ suspend fun loadGerrit() {
 }
 
 fun check(resultsDir: File) {
+  val lightIds = loadLightChanges(resultsDir)
+  val loadedChanges = loadChanges(resultsDir)
+  val diff = lightIds - loadedChanges
+  println("Not loaded: ${diff.size}")
+  println(diff)
+}
+
+fun loadLightChanges(resultsDir: File): Set<Int> {
   val json = ClientGerritREST().json
 
   val lightChangesIterator =
@@ -36,8 +44,6 @@ fun check(resultsDir: File) {
       ExtractorUtil.getFilesIgnoreHidden(File(resultsDir, "light_changes")),
       json
     )
-  val changesIterator =
-    LoaderChanges.ChangeFilesValueIterator(ExtractorUtil.getFilesIgnoreHidden(File(resultsDir, "changes")), json)
 
   val dateFormatter = ClientUtil.getDateFormatterGetter()
 
@@ -58,6 +64,17 @@ fun check(resultsDir: File) {
     }
   }
 
+  println("$resultsDir : Light: ${lightIds.size}; Copies: $lightIdsCopies; minUpdated: $minUpdatedLight; maxUpdated: $maxUpdatedLight")
+
+  return lightIds
+}
+
+fun loadChanges(resultsDir: File): Set<Int> {
+  val json = ClientGerritREST().json
+  val changesIterator =
+    LoaderChanges.ChangeFilesValueIterator(ExtractorUtil.getFilesIgnoreHidden(File(resultsDir, "changes")), json)
+
+  val dateFormatter = ClientUtil.getDateFormatterGetter()
   var minUpdated: Date? = null
   var maxUpdated: Date? = null
   val loadedChanges = mutableSetOf<Int>()
@@ -74,13 +91,8 @@ fun check(resultsDir: File) {
       if (maxUpdated < updatedDate) maxUpdated = updatedDate
     }
   }
-
-  val diff = lightIds - loadedChanges
-
-  println("Light: ${lightIds.size}; Copies: $lightIdsCopies; minUpdated: $minUpdatedLight; maxUpdated: $maxUpdatedLight")
   println("Loaded: ${loadedChanges.size}; Copies: $loadedChangesCopies; minUpdated: $minUpdated; maxUpdated: $maxUpdated")
-  println("Not loaded: ${diff.size}")
-  println(diff)
+  return loadedChanges
 }
 
 suspend fun main() {
