@@ -8,5 +8,5 @@ object ExtractorUtil {
   fun getFilesIgnoreHidden(dir: File) =
     dir.walk()
       .filter { it.isFile && !it.name.startsWith(".") }
-      .sortedBy { it.name }
+      .sortedBy { it.name.toInt() }
 }
