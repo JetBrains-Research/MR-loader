@@ -13,10 +13,10 @@ At the moment, CLI can be used for loading from Gerrit.
 
 The script should be executed as:
 ```shell script
-./run.sh commandName options arguments
+sh ./run.sh GerritLoad options arguments
 ```
 
 To get more info about options:
 ```shell script
-./run.sh commandName -h
+sh ./run.sh GerritLoad -h
 ```
