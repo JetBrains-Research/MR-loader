@@ -25,7 +25,7 @@ class ExtractorChanges(
     val folder = baseUrlToDomain(baseUrl)
     if (resultDir == null) File("./dataset/gerrit/$folder") else File(resultDir, "dataset/$folder")
   }
-  private val writers = HashMap<String, HashMap<String, WriterCSV>>()
+  private val writerProvider = WriterProvider()
 
   suspend fun run(
     ignoreLoad: Boolean = false,
@@ -53,12 +53,7 @@ class ExtractorChanges(
       addUsers(changeGerrit)
     }
 
-    writers.values.forEach { projectWriters ->
-      projectWriters.values.forEach {
-        it.writeToFile()
-        it.close()
-      }
-    }
+    writerProvider.writeAllAndClose()
   }
 
   private fun initFile(file: File, headers: String) {
@@ -69,9 +64,7 @@ class ExtractorChanges(
 
   private fun resultFile(key: String, project: String) = File(resultsFolder, "$key/${project}.csv")
 
-  private fun getWriter(project: String, type: TypeCSV, file: File) = writers
-    .computeIfAbsent(project) { HashMap() }
-    .computeIfAbsent(type.name) { WriterCSV(file, type) }
+  private fun getWriter(project: String, type: TypeCSV, file: File) = writerProvider.getWriter(project, type, file)
 
   private fun changesFile(project: String) = resultFile("changes", project)
 

@@ -50,8 +50,10 @@ class WriterCSV(private val file: File, val type: TypeCSV) {
 
   init {
     if (!file.parentFile.exists()) file.parentFile.mkdirs()
-    writer = BufferedWriter(FileWriter(file))
-    addLineCSV(*type.fields)
+    if (!file.exists()) {
+      addLineCSV(*type.fields)
+    }
+    writer = BufferedWriter(FileWriter(file, true))
   }
 
   fun addLineCSV(vararg fields: String) {
