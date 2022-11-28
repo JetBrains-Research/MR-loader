@@ -56,12 +56,6 @@ class ExtractorChanges(
     writerProvider.writeAllAndClose()
   }
 
-  private fun initFile(file: File, headers: String) {
-    file.parentFile.mkdirs()
-    if (!file.exists())
-      file.writeText(headers)
-  }
-
   private fun resultFile(key: String, project: String) = File(resultsFolder, "$key/${project}.csv")
 
   private fun getWriter(project: String, type: TypeCSV, file: File) = writerProvider.getWriter(project, type, file)
