@@ -32,11 +32,13 @@ class LoaderChanges(
   resultDir: File? = null,
   val beforeThreshold: Date? = null,
   val afterThreshold: Date? = null,
-  val ignoreState: Boolean = false
+  val ignoreState: Boolean = false,
+  val numOfThreads: Int = DEFAULT_NUM_THREADS
 ) {
 
   companion object {
     const val TIMEOUT = 500L
+    const val DEFAULT_NUM_THREADS = 12
 
     // TODO: needs check
     private val IGNORE_PROJECTS = setOf("All-Projects", "All-Users")
@@ -190,12 +192,11 @@ class LoaderChanges(
 
     loadNeededIds()
 
-    val nThreads = 12
-    val threadPool = Executors.newFixedThreadPool(nThreads)
+    val threadPool = Executors.newFixedThreadPool(numOfThreads)
 
     try {
-      loadChangesByIds(threadPool, nThreads)
-      loadComments(threadPool, nThreads)
+      loadChangesByIds(threadPool, numOfThreads)
+      loadComments(threadPool, numOfThreads)
     } finally {
       threadPool.shutdown()
     }

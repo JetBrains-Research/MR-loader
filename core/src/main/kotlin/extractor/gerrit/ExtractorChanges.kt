@@ -30,9 +30,10 @@ class ExtractorChanges(
   suspend fun run(
     ignoreLoad: Boolean = false,
     beforeThreshold: Date? = null,
-    afterThreshold: Date? = null
+    afterThreshold: Date? = null,
+    numOfThreads: Int = LoaderChanges.DEFAULT_NUM_THREADS
   ) {
-    val loader = LoaderChanges(baseUrl, resultDir, beforeThreshold, afterThreshold)
+    val loader = LoaderChanges(baseUrl, resultDir, beforeThreshold, afterThreshold, numOfThreads = numOfThreads)
     if (!ignoreLoad) {
       loader.loadByIds()
     }

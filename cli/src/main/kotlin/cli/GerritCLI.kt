@@ -6,8 +6,10 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.file
+import com.github.ajalt.clikt.parameters.types.int
 import extractor.gerrit.ExtractorChanges
 import kotlinx.coroutines.runBlocking
+import loader.gerrit.LoaderChanges
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -26,12 +28,21 @@ class GerritCLI :
   ).default(ExtractorChanges.DEFAULT_PATCHSET_COMMENT_KEY)
   private val beforeThreshold by option("--before", help = dateHelpMessage("Before")).convert { convertDate(it) }
   private val afterThreshold by option("--after", help = dateHelpMessage("After")).convert { convertDate(it) }
+  private val numOfThreads by option(
+    "--num-of-threads",
+    help = "Number of threads for loading data. By default ${LoaderChanges.DEFAULT_NUM_THREADS}"
+  ).int().default(LoaderChanges.DEFAULT_NUM_THREADS)
 
   override fun run() {
     runBlocking {
       val extractorChanges =
         ExtractorChanges(url, dataDir, patchsetCommentKey = patchsetCommentKey)
-      extractorChanges.run(beforeThreshold = beforeThreshold, afterThreshold = afterThreshold, ignoreLoad = false)
+      extractorChanges.run(
+        beforeThreshold = beforeThreshold,
+        afterThreshold = afterThreshold,
+        ignoreLoad = false,
+        numOfThreads = numOfThreads
+      )
     }
   }
 
