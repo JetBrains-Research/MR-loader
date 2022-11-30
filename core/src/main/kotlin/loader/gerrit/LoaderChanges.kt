@@ -14,7 +14,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import loader.gerrit.iterators.ChangeFilesValueIterator
+import loader.gerrit.iterators.ChangesMetaDataFilesIterator
 import java.io.File
 import java.util.*
 import java.util.concurrent.Callable
@@ -55,76 +56,6 @@ class LoaderChanges(
       val formatter = SimpleFormatter()
       fh.formatter = formatter
       result
-    }
-  }
-
-  class ChangeFilesValueIterator(files: Sequence<File>, private val json: Json) : Iterator<ChangeGerrit> {
-    private var fileIter = files.iterator()
-    private var valueIter: Iterator<ChangeGerrit>? = null
-
-    override fun next(): ChangeGerrit {
-      return valueIter!!.next()
-    }
-
-    override fun hasNext(): Boolean {
-      checkAndSetIterators()
-      return !valueIteratorIsFinished()
-    }
-
-    private fun checkAndSetIterators() {
-      if (valueIteratorIsFinished()) {
-        if (fileIter.hasNext()) {
-          val file = fileIter.next()
-          valueIter = json.decodeFromString<Map<Int, ChangeGerrit>>(file.readText()).values.iterator()
-        }
-      }
-    }
-
-    private fun valueIteratorIsFinished() = valueIter == null || valueIter?.hasNext() == false
-
-  }
-
-  class ChangesMetaDataFilesIterator(files: Sequence<File>, private val json: Json) : Iterator<ChangeMetaData> {
-    private var fileIter = files.iterator()
-    private var listIter: Iterator<List<ChangeMetaData>>? = null
-    private var valueIter: Iterator<ChangeMetaData>? = null
-
-    override fun next(): ChangeMetaData {
-      return valueIter!!.next()
-    }
-
-    override fun hasNext(): Boolean = checkAndSetIterators()
-
-
-    private fun checkAndSetIterators(): Boolean {
-      when {
-        listIter == null -> resetIterators()
-
-        valueIter?.hasNext() == false -> {
-          if (listIter!!.hasNext()) {
-            resetValueIterator()
-          } else {
-            resetIterators()
-          }
-        }
-      }
-
-      return valueIter?.hasNext() ?: false
-    }
-
-    private fun resetIterators() {
-      if (fileIter.hasNext()) {
-        val file = fileIter.next()
-        val listOfList = json.decodeFromString<List<List<ChangeMetaData>>>(file.readText())
-        // assume files not empty
-        listIter = listOfList.iterator()
-        resetValueIterator()
-      }
-    }
-
-    private fun resetValueIterator() {
-      val list = listIter!!.next()
-      valueIter = list.iterator()
     }
   }
 

@@ -3,6 +3,8 @@ import client.ClientUtil
 import extractor.ExtractorUtil
 import extractor.gerrit.ExtractorChanges
 import loader.gerrit.LoaderChanges
+import loader.gerrit.iterators.ChangeFilesValueIterator
+import loader.gerrit.iterators.ChangesMetaDataFilesIterator
 import java.io.File
 import java.util.*
 
@@ -40,7 +42,7 @@ fun loadLightChanges(resultsDir: File): Set<Int> {
   val json = ClientGerritREST().json
 
   val lightChangesIterator =
-    LoaderChanges.ChangesMetaDataFilesIterator(
+    ChangesMetaDataFilesIterator(
       ExtractorUtil.getFilesIgnoreHidden(File(resultsDir, "light_changes")),
       json
     )
@@ -72,7 +74,7 @@ fun loadLightChanges(resultsDir: File): Set<Int> {
 fun loadChanges(resultsDir: File): Set<Int> {
   val json = ClientGerritREST().json
   val changesIterator =
-    LoaderChanges.ChangeFilesValueIterator(ExtractorUtil.getFilesIgnoreHidden(File(resultsDir, "changes")), json)
+    ChangeFilesValueIterator(ExtractorUtil.getFilesIgnoreHidden(File(resultsDir, "changes")), json)
 
   val dateFormatter = ClientUtil.getDateFormatterGetter()
   var minUpdated: Date? = null
