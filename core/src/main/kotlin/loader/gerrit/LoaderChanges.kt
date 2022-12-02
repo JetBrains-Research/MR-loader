@@ -140,54 +140,78 @@ class LoaderChanges(
   private suspend fun loadNeededIds() {
     if (stateOfLoad.finishedLoadingIds && !ignoreState) return
 
-    val projects = client.getProjects(baseUrl)
+    val projects =
+      wrapIgnoringErrors(msg = "Loading projects for url=$baseUrl") { client.getProjects(baseUrl) } ?: return
     logger.info("Number of projects: ${projects.size}")
     val jsonObjectsListBuffer = JsonObjectsListBuffer(lightChangesDir)
 
     for (project in projects) {
       if (project in IGNORE_PROJECTS) continue
-      var moreChanges = true
-      var before = beforeThreshold?.let { dateFormatter.format(beforeThreshold) }
-      while (moreChanges) {
-        Thread.sleep(TIMEOUT)
-        val rawJson =
-          getChangesWrapped(project, before = before, light = true)
-        val metaData = decodeChangesMetaData(rawJson)
+      for (status in setOf("open", "abandoned", "merged")) {
+        var moreChanges = true
+        var offset = 0
+        val before = beforeThreshold?.let { dateFormatter.format(it) }
+        while (moreChanges) {
+          Thread.sleep(TIMEOUT)
+          var parameterString = "project=$project; status=$status; offset=$offset; before=$before; "
+          val rawJson =
+            wrapIgnoringErrors(msg = "Loading light changes $parameterString") {
+              client.getChangesRawLight(
+                baseUrl,
+                project,
+                status,
+                offset,
+                before
+              )
+            } ?: break
 
-        if (metaData.isEmpty()) {
-          logger.warning("Got empty list of changes for project=$project; before=$before;")
-          break
-        }
-
-        val lastChange = metaData.last()
-        if (afterThreshold != null) {
-          val lastDate = dateFormatter.parse(lastChange.updated)
-          if (lastDate <= afterThreshold) {
-            val firstChange = metaData.first()
-            val firstDate = dateFormatter.parse(firstChange.updated)
-            if (firstDate <= afterThreshold) {
-              logger.info("Skipping load for project=$project; before=$before; size=${metaData.size}; not in threshold firstDate=$firstDate; lastDate=$lastDate")
-              break
-            }
-            jsonObjectsListBuffer.addObject(rawJson)
-            logger.info("Loaded changes for project=$project; firstDate=$firstDate; lastDate=$lastDate size=${metaData.size};")
+          val metaData = decodeChangesMetaData(rawJson)
+          if (metaData.isEmpty()) {
+            logger.warning("Got empty list of changes for $parameterString")
             break
           }
-        }
-        jsonObjectsListBuffer.addObject(rawJson)
-        before = lastChange.updated
-        moreChanges = lastChange.moreChanges ?: false
+          parameterString += "size=${metaData.size}; "
 
-        logger.info("Loaded changes for project=$project; before=$before; size=${metaData.size}; moreChanges=$moreChanges")
+          if (!isInThresholds(metaData, rawJson, jsonObjectsListBuffer, parameterString)) break
+
+          val lastChange = metaData.last()
+          jsonObjectsListBuffer.addObject(rawJson)
+          moreChanges = lastChange.moreChanges ?: false
+          offset += metaData.size
+
+          logger.info("Loaded changes for $parameterString moreChanges=$moreChanges")
+        }
       }
     }
-
     jsonObjectsListBuffer.close()
     stateOfLoad.finishedLoadingIds = true
     saveState()
     logger.info("Finished light load of changes.")
   }
 
+  private fun isInThresholds(
+    metaData: List<ChangeMetaData>,
+    rawJson: String,
+    jsonObjectsListBuffer: JsonObjectsListBuffer,
+    parameterString: String
+  ): Boolean {
+    val lastChange = metaData.last()
+    if (afterThreshold != null) {
+      val lastDate = dateFormatter.parse(lastChange.updated)
+      if (lastDate <= afterThreshold) {
+        val firstChange = metaData.first()
+        val firstDate = dateFormatter.parse(firstChange.updated)
+        if (firstDate <= afterThreshold) {
+          logger.info("Skipping load for $parameterString not in threshold firstDate=$firstDate; lastDate=$lastDate")
+          return false
+        }
+        jsonObjectsListBuffer.addObject(rawJson)
+        logger.info("Loaded changes for $parameterString firstDate=$firstDate; lastDate=$lastDate ")
+        return false
+      }
+    }
+    return true
+  }
 
   private suspend fun loadChangesByIds(threadPool: ExecutorService, nThreads: Int) {
     if (stateOfLoad.finishedLoadingChanges && !ignoreState) return
@@ -377,10 +401,9 @@ class LoaderChanges(
   private suspend fun <T> wrapIgnoringErrors(
     msg: String = "",
     maxNumOfErrors: Int = 3,
-    proceedError: (Throwable) -> Unit = {},
     task: suspend () -> T?
   ): T? {
-    var numOfErrors = 0
+    var numOfErrors = 1
     while (true) {
       try {
         return task()
@@ -391,12 +414,12 @@ class LoaderChanges(
           continue
         }
 
-        logger.severe("$msg : ${e.message}")
-        numOfErrors += 1
         if (numOfErrors > maxNumOfErrors) {
-          proceedError(e)
+          logger.severe("Number of errors for task exceeded threshold=$maxNumOfErrors : $msg : ${e.message}")
           return null
         }
+        numOfErrors += 1
+        logger.warning("Got error : $msg : ${e.message}")
       }
     }
   }
@@ -466,9 +489,7 @@ class LoaderChanges(
       val runnable = Callable {
         runBlocking {
           try {
-            val rawComments = wrapIgnoringErrors("Raw comments changeId=${id}", proceedError = {
-              errorsCommentsBuffer.addEntry(it.message ?: "", id)
-            }) {
+            val rawComments = wrapIgnoringErrors("Raw comments changeId=${id}") {
               client.getCommentsRaw(
                 baseUrl,
                 changeId = id

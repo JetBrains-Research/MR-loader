@@ -63,6 +63,18 @@ class ClientGerritREST {
   suspend fun getChangesRawLight(baseUrl: String, before: String? = null, after: String? = null, nChanges: Int = 300) =
     requestRaw("$baseUrl/changes/?${timeGap(before, after)}&n=$nChanges")
 
+  suspend fun getChangesRawLight(
+    baseUrl: String,
+    project: String,
+    status: String,
+    offset: Int,
+    before: String? = null
+  ): String {
+    val beforeQuery = before?.let { "+before:$it" } ?: ""
+    val query = "?q=project:$project+status:$status$beforeQuery"
+    return requestRaw("$baseUrl/changes/$query&S=$offset")
+  }
+
   suspend fun getChangesRawLightNew(baseUrl: String, offset: Int) =
     requestRaw("$baseUrl/changes/?S=$offset")
 
