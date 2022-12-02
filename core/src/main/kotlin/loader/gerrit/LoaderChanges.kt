@@ -22,7 +22,6 @@ import java.util.concurrent.Callable
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.logging.FileHandler
 import java.util.logging.Logger
 import java.util.logging.SimpleFormatter
@@ -86,14 +85,8 @@ class LoaderChanges(
   private val errorsCommentsDir = File(errorsDir, "comments")
   private val stateOfLoadFile = File(resultDir, "state")
 
-
   private val client = ClientGerritREST()
   private val dateFormatter = ClientUtil.getDateFormatterGetter()
-  private val errorsChangesBuffer = JsonObjectsMapBuffer(errorsChangesDir)
-  private val errorsCommentsBuffer = JsonObjectsMapBuffer(errorsCommentsDir)
-
-  private val series = arrayOf(300, 150, 100, 50, 30, 15, 10, 5, 3, 1)
-  private val nChangesAtomic = AtomicInteger(series[0])
 
   private val stateOfLoad = run {
     val default = StateOfLoad(
@@ -131,10 +124,6 @@ class LoaderChanges(
     } finally {
       threadPool.shutdown()
     }
-
-
-    errorsChangesBuffer.close()
-    errorsCommentsBuffer.close()
   }
 
   private suspend fun loadNeededIds() {
@@ -348,56 +337,6 @@ class LoaderChanges(
     }
   }
 
-  // TODO: refactor
-  private fun decreaseNumOfChanges(prevValue: Int) {
-    // 300, 150, 100, 50, 30, 15, 10, 5, 3, 1
-    val idx = series.indexOfFirst { it == prevValue }
-    if (idx + 1 >= series.size) throw Exception("Can't load less then ${series[idx]}")
-    nChangesAtomic.compareAndSet(prevValue, series[idx + 1])
-  }
-
-  //TODO: Refactor
-  private suspend fun getChangesWrapped(
-    project: String,
-    before: String? = null,
-    after: String? = null,
-    maxNumOfErrors: Int = 5,
-    light: Boolean = false
-  ): String {
-    var numOfErrors = 0
-    while (true) {
-      val nChanges = nChangesAtomic.get()
-      val msg = "Raw changes before=$before; after=$after; nChanges=$nChanges"
-      try {
-        return if (!light) client.getChangesRaw(
-          baseUrl,
-          before,
-          after,
-          nChanges
-        ) else client.getChangesRawLightWithProject(baseUrl, project, before, after, nChanges)
-      } catch (e: Throwable) {
-
-        if (e.message?.contains("408") == true) {
-          logger.warning("Decreasing number of changes per request. Previous: $nChanges. : Got error ${e.message}")
-          decreaseNumOfChanges(nChanges)
-          continue
-        }
-
-        if (e.message?.contains("429") == true) {
-          logger.warning("$msg : Error message contains 429 going sleep for 1 minute.")
-          Thread.sleep(60_000)
-          continue
-        }
-
-        logger.severe("$msg : ${e.message}")
-        numOfErrors += 1
-        if (numOfErrors > maxNumOfErrors) {
-          throw e
-        }
-      }
-    }
-  }
-
   private suspend fun <T> wrapIgnoringErrors(
     msg: String = "",
     maxNumOfErrors: Int = 3,
@@ -488,20 +427,14 @@ class LoaderChanges(
 
       val runnable = Callable {
         runBlocking {
-          try {
-            val rawComments = wrapIgnoringErrors("Raw comments changeId=${id}") {
-              client.getCommentsRaw(
-                baseUrl,
-                changeId = id
-              )
-            }
-            rawComments?.let { jsonObjectBuffer.addEntry(it, id) }
-
-            logger.info("Loaded comments for ${id}")
-          } catch (e: Throwable) {
-            errorsCommentsBuffer.addEntry(e.message ?: "", id)
+          val rawComments = wrapIgnoringErrors("Raw comments changeId=${id}") {
+            client.getCommentsRaw(
+              baseUrl,
+              changeId = id
+            )
           }
-
+          rawComments?.let { jsonObjectBuffer.addEntry(it, id) }
+          logger.info("Loaded comments for $id")
           true
         }
       }
