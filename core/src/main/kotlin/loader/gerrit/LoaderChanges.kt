@@ -330,7 +330,7 @@ class LoaderChanges(
         changeIds.add(changeId)
 
         val comments = commentsMap[changeId]
-        if (change.totalCommentCount > 0 && comments == null) throw Exception("Can't find comments for ${change.number}")
+        if (change.totalCommentCount > 0 && comments == null) logger.severe("Can't find comments for ${change.number}")
         processChanges(change, comments)
       }
       logger.info("Finished changes from ${file.name} file")
