@@ -85,10 +85,10 @@ class ExtractorChanges(
       changeGerrit.number.toString(),
       changeGerrit.owner.keyUser,
       changeGerrit.status,
-      "\"$comment\"",
+      addCommas(comment),
       changeGerrit.keyChange,
       changeGerrit.updated,
-      "\"$subject\""
+      addCommas(subject)
     )
   }
 
@@ -180,7 +180,7 @@ class ExtractorChanges(
     }
   }
 
-  private fun keyFile(changeGerrit: ChangeGerrit, filePath: String) = "\"${changeGerrit.project}:${filePath}\""
+  private fun keyFile(changeGerrit: ChangeGerrit, filePath: String) = addCommas("${changeGerrit.project}:${filePath}")
 
   private fun keyCommit(project: String, hash: String) = "$project:$hash"
   private fun filesFile(project: String) = resultFile("files", project)
@@ -213,7 +213,7 @@ class ExtractorChanges(
 
   private fun WriterCSV.addUser(user: UserAccountGerrit) =
     addLineCSV(
-      user.name,
+      addCommas(user.name),
       user.email,
       user.username
     )
@@ -253,4 +253,6 @@ class ExtractorChanges(
       }
     }
   }
+
+  private fun addCommas(value: String) = "\"$value\""
 }
