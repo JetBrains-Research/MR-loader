@@ -34,12 +34,18 @@ class ChangesMetaDataFilesIterator(files: Sequence<File>, private val json: Json
   }
 
   private fun resetIterators() {
-    if (fileIter.hasNext()) {
+
+    while (fileIter.hasNext()) {
       val file = fileIter.next()
-      val listOfList = json.decodeFromString<List<List<ChangeMetaData>>>(file.readText())
-      // assume files not empty
+      val jsonText = file.readText()
+      if (jsonText.isEmpty()) continue
+
+      val listOfList = json.decodeFromString<List<List<ChangeMetaData>>>(jsonText)
+      if (listOfList.isEmpty()) continue
+
       listIter = listOfList.iterator()
       resetValueIterator()
+      return
     }
   }
 
