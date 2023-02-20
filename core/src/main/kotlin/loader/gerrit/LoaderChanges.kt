@@ -15,7 +15,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import loader.gerrit.iterators.ChangeFilesValueIterator
-import loader.gerrit.iterators.ChangesMetaDataFilesIterator
 import java.io.File
 import java.util.*
 import java.util.concurrent.Callable
@@ -68,7 +67,6 @@ class LoaderChanges(
   @Serializable
   private data class StateOfLoad(
     val parameters: Parameters,
-    var finishedLoadingIds: Boolean = false,
     var finishedLoadingChanges: Boolean = false,
     var finishedLoadingComments: Boolean = false
   )
@@ -114,68 +112,30 @@ class LoaderChanges(
     errorsCommentsDir.mkdirs()
     saveState()
 
-    loadNeededIds()
+//    Feb 14, 2023 9:20:42 PM loader.gerrit.LoaderChanges wrapIgnoringErrors
+//    WARNING: Got error :  : Client request(https://android-review.googlesource.com/changes/3000000/?o=DETAILED_LABELS&o=ALL_FILES&o=ALL_REVISIONS&o=ALL_COMMITS&o=COMMIT_FOOTERS&o=DETAILED_ACCOUNTS) invalid: 404 Not Found. Text: "Not found: 3000000
+//    "
+    val maxChange = findMax() ?: throw Throwable("There is no max change.")
 
     val threadPool = Executors.newFixedThreadPool(numOfThreads)
 
     try {
-      loadChangesByIds(threadPool, numOfThreads)
+      loadChangesByIds(maxChange.number, threadPool, numOfThreads)
       loadComments(threadPool, numOfThreads)
     } finally {
       threadPool.shutdown()
     }
   }
 
-  private suspend fun loadNeededIds() {
-    if (stateOfLoad.finishedLoadingIds && !ignoreState) return
-
-    val projects =
-      wrapIgnoringErrors(msg = "Loading projects for url=$baseUrl") { client.getProjects(baseUrl) } ?: return
-    logger.info("Number of projects: ${projects.size}")
-    val jsonObjectsListBuffer = JsonObjectsListBuffer(lightChangesDir)
-
-    for (project in projects) {
-      if (project in IGNORE_PROJECTS) continue
-      for (status in setOf("open", "abandoned", "merged")) {
-        var moreChanges = true
-        var offset = 0
-        val before = beforeThreshold?.let { dateFormatter.format(it) }
-        while (moreChanges) {
-          Thread.sleep(TIMEOUT)
-          var parameterString = "project=$project; status=$status; offset=$offset; before=$before; "
-          val rawJson =
-            wrapIgnoringErrors(msg = "Loading light changes $parameterString") {
-              client.getChangesRawLight(
-                baseUrl,
-                project,
-                status,
-                offset,
-                before
-              )
-            } ?: break
-
-          val metaData = decodeChangesMetaData(rawJson)
-          if (metaData.isEmpty()) {
-            logger.warning("Got empty list of changes for $parameterString")
-            break
-          }
-          parameterString += "size=${metaData.size}; "
-
-          if (!isInThresholds(metaData, rawJson, jsonObjectsListBuffer, parameterString)) break
-
-          val lastChange = metaData.last()
-          jsonObjectsListBuffer.addObject(rawJson)
-          moreChanges = lastChange.moreChanges ?: false
-          offset += metaData.size
-
-          logger.info("Loaded changes for $parameterString moreChanges=$moreChanges")
-        }
-      }
-    }
-    jsonObjectsListBuffer.close()
-    stateOfLoad.finishedLoadingIds = true
-    saveState()
-    logger.info("Finished light load of changes.")
+  private suspend fun findMax(): ChangeMetaData? {
+    val rawBatch = wrapIgnoringErrors(msg = "Loading first batch of light changes url=$baseUrl") {
+      client.getChangesRawLightNew(
+        baseUrl,
+        0
+      )
+    } ?: return null
+    val batch = decodeChangesMetaData(rawBatch)
+    return batch.maxByOrNull { it.number }
   }
 
   private fun isInThresholds(
@@ -202,12 +162,12 @@ class LoaderChanges(
     return true
   }
 
-  private suspend fun loadChangesByIds(threadPool: ExecutorService, nThreads: Int) {
+  private suspend fun loadChangesByIds(maxId: Int, threadPool: ExecutorService, nThreads: Int) {
     if (stateOfLoad.finishedLoadingChanges && !ignoreState) return
 
     val futures = mutableListOf<Future<Boolean>>()
     val jsonObjectBuffer = JsonObjectsMapBuffer(changesDir)
-    val iter = ChangesMetaDataFilesIterator(getFilesIgnoreHidden(lightChangesDir), client.json)
+    val iter = (0..maxId).iterator()
     val loadedIds = if (ignoreState) null else loadedChangeIds()
     addLoadSingleChange(futures, iter, jsonObjectBuffer, threadPool, nThreads, loadedIds)
     try {
@@ -234,7 +194,7 @@ class LoaderChanges(
 
   private fun addLoadSingleChange(
     futures: MutableList<Future<Boolean>>,
-    idsIterator: ChangesMetaDataFilesIterator,
+    idsIterator: Iterator<Int>,
     jsonObjectBuffer: JsonObjectsMapBuffer,
     threadPool: ExecutorService,
     numOfTasks: Int,
@@ -243,18 +203,18 @@ class LoaderChanges(
     var count = 0
     while (count != numOfTasks) {
       if (idsIterator.hasNext()) {
-        val metaData = idsIterator.next()
-        val id = metaData.number
+        val id = idsIterator.next()
 
         if (loadedIds != null && id in loadedIds) {
           logger.info("Already got change: $id. Skipping.")
           continue
         }
 
-        if (!changeInThresholds(metaData)) {
-          logger.info("Change $id not in thresholds. Skipping.")
-          continue
-        }
+        // TODO: think about partial load
+//        if (!changeInThresholds(metaData)) {
+//          logger.info("Change $id not in thresholds. Skipping.")
+//          continue
+//        }
 
         val callable = Callable {
           runBlocking {
@@ -347,18 +307,27 @@ class LoaderChanges(
       try {
         return task()
       } catch (e: Throwable) {
-        if (e.message?.contains("429") == true) {
-          logger.warning("$msg : Error message contains 429 going sleep for 1 minute.")
-          Thread.sleep(60_000)
-          continue
+        val errMsg = e.message ?: "Error message is empty"
+        when {
+          errMsg.contains("404") -> {
+            logger.warning("$msg : Skipping. Error message contains 404.")
+            return null
+          }
+
+          errMsg.contains("429") -> {
+            logger.warning("$msg : Sleep for 1 minute. Error message contains 429.")
+            Thread.sleep(60_000)
+            continue
+          }
+
+          numOfErrors > maxNumOfErrors -> {
+            logger.severe("Number of errors for task exceeded threshold=$maxNumOfErrors : $msg : $errMsg")
+            return null
+          }
         }
 
-        if (numOfErrors > maxNumOfErrors) {
-          logger.severe("Number of errors for task exceeded threshold=$maxNumOfErrors : $msg : ${e.message}")
-          return null
-        }
         numOfErrors += 1
-        logger.warning("Got error : $msg : ${e.message}")
+        logger.warning("Got error : $msg : $errMsg")
       }
     }
   }
