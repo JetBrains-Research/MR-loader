@@ -169,11 +169,12 @@ class LoaderChanges(
     val jsonObjectBuffer = JsonObjectsMapBuffer(changesDir)
     val iter = (0..maxId).iterator()
     val loadedIds = if (ignoreState) null else loadedChangeIds()
-    addLoadSingleChange(futures, iter, jsonObjectBuffer, threadPool, nThreads, loadedIds)
     try {
-      wrapThreadPool(futures) {
-        addLoadSingleChange(futures, iter, jsonObjectBuffer, threadPool, it.size, loadedIds)
+      while (iter.hasNext()) {
+        addLoadSingleChange(futures, iter, jsonObjectBuffer, threadPool, nThreads, loadedIds)
+        wrapThreadPool(futures) {}
       }
+      wrapThreadPool(futures) {}
     } finally {
       jsonObjectBuffer.close()
     }
@@ -364,7 +365,6 @@ class LoaderChanges(
     val changeFilesValueIterator = ChangeFilesValueIterator(loadedChangesFiles, client.json)
     val futures = mutableListOf<Future<Boolean>>()
     addCommentLoadTasks(futures, threadPool, changeFilesValueIterator, commentIds, jsonObjectBuffer, nThreads)
-
 
     wrapThreadPool(futures, delay = 500) {
       addCommentLoadTasks(futures, threadPool, changeFilesValueIterator, commentIds, jsonObjectBuffer, it.size)
