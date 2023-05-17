@@ -208,12 +208,6 @@ class LoaderChanges(
           continue
         }
 
-        // TODO: think about partial load
-//        if (!changeInThresholds(metaData)) {
-//          logger.info("Change $id not in thresholds. Skipping.")
-//          continue
-//        }
-
         val callable = Callable {
           runBlocking {
             wrapIgnoringErrors { client.getChangeRaw(baseUrl, id) }?.let { rawJson ->
