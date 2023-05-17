@@ -112,9 +112,6 @@ class LoaderChanges(
     errorsCommentsDir.mkdirs()
     saveState()
 
-//    Feb 14, 2023 9:20:42 PM loader.gerrit.LoaderChanges wrapIgnoringErrors
-//    WARNING: Got error :  : Client request(https://android-review.googlesource.com/changes/3000000/?o=DETAILED_LABELS&o=ALL_FILES&o=ALL_REVISIONS&o=ALL_COMMITS&o=COMMIT_FOOTERS&o=DETAILED_ACCOUNTS) invalid: 404 Not Found. Text: "Not found: 3000000
-//    "
     val maxChange = findMax() ?: throw Throwable("There is no max change.")
 
     val threadPool = Executors.newFixedThreadPool(numOfThreads)
