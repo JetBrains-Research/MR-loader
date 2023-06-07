@@ -1,7 +1,6 @@
 package cli
 
 import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.parameters.options.convert
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
@@ -26,8 +25,6 @@ class GerritCLI :
     "--patchset-comment-key",
     help = "Comments key for the whole patchset."
   ).default(ExtractorChanges.DEFAULT_PATCHSET_COMMENT_KEY)
-  private val beforeThreshold by option("--before", help = dateHelpMessage("Before")).convert { convertDate(it) }
-  private val afterThreshold by option("--after", help = dateHelpMessage("After")).convert { convertDate(it) }
   private val numOfThreads by option(
     "--num-of-threads",
     help = "Number of threads for loading data. By default ${LoaderChanges.DEFAULT_NUM_THREADS}"
@@ -38,8 +35,6 @@ class GerritCLI :
       val extractorChanges =
         ExtractorChanges(url, dataDir, patchsetCommentKey = patchsetCommentKey)
       extractorChanges.run(
-        beforeThreshold = beforeThreshold,
-        afterThreshold = afterThreshold,
         ignoreLoad = false,
         numOfThreads = numOfThreads
       )

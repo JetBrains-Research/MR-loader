@@ -18,16 +18,17 @@ class ClientGerritREST {
       "COMMIT_FOOTERS",
       "DETAILED_ACCOUNTS"
     ).joinToString("&o=")
+
+    val json = Json {
+      ignoreUnknownKeys = true
+      encodeDefaults = true
+    }
   }
 
   private val client = HttpClient() {
     install(HttpTimeout) {
       socketTimeoutMillis = 600_000
     }
-  }
-  val json = Json {
-    ignoreUnknownKeys = true
-    encodeDefaults = true
   }
 
   suspend fun requestRaw(urlString: String) = client.request<String>(urlString).removePrefix(START_RESPONSE)

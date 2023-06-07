@@ -1,4 +1,3 @@
-import client.ClientGerritREST
 import client.ClientUtil
 import extractor.ExtractorUtil
 import extractor.gerrit.ExtractorChanges
@@ -10,12 +9,6 @@ import java.util.*
 
 
 suspend fun loadGerrit() {
-  val dateFormat = ClientUtil.getDateFormatterGetter()
-
-//  "yyyy-MM-dd HH:mm:ss.SSSSSSSSS"
-  val beforeThreshold = dateFormat.parse("2022-10-21 23:59:00.000000000")
-  val afterThreshold = dateFormat.parse("2022-09-30 23:59:00.000000000")
-
   val path = System.getProperty("user.home") + File.separator + "work"
   val dir = File(path)
   val dataDir = File(dir, "__openstack")
@@ -23,11 +16,9 @@ suspend fun loadGerrit() {
   val patchsetCommentKey = "/PATCHSET_LEVEL"
   val extractorChanges =
     ExtractorChanges(url, dataDir, patchsetCommentKey = patchsetCommentKey)
-  extractorChanges.run(beforeThreshold = beforeThreshold, afterThreshold = afterThreshold)
-
+  extractorChanges.run()
   val resultsDir = File(dataDir, LoaderChanges.baseUrlToDomain(url))
   check(resultsDir)
-
 }
 
 fun check(resultsDir: File) {
@@ -39,13 +30,8 @@ fun check(resultsDir: File) {
 }
 
 fun loadLightChanges(resultsDir: File): Set<Int> {
-  val json = ClientGerritREST().json
-
   val lightChangesIterator =
-    ChangesMetaDataFilesIterator(
-      ExtractorUtil.getFilesIgnoreHidden(File(resultsDir, "light_changes")),
-      json
-    )
+    ChangesMetaDataFilesIterator(ExtractorUtil.getFilesIgnoreHidden(File(resultsDir, "light_changes")))
 
   val dateFormatter = ClientUtil.getDateFormatterGetter()
 
@@ -72,9 +58,8 @@ fun loadLightChanges(resultsDir: File): Set<Int> {
 }
 
 fun loadChanges(resultsDir: File): Set<Int> {
-  val json = ClientGerritREST().json
   val changesIterator =
-    ChangeFilesValueIterator(ExtractorUtil.getFilesIgnoreHidden(File(resultsDir, "changes")), json)
+    ChangeFilesValueIterator(ExtractorUtil.getFilesIgnoreHidden(File(resultsDir, "changes")))
 
   val dateFormatter = ClientUtil.getDateFormatterGetter()
   var minUpdated: Date? = null
