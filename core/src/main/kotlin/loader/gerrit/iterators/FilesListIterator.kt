@@ -2,16 +2,14 @@ package loader.gerrit.iterators
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.Json
 import java.io.File
 
 
 open class FilesListIterator<T>(
   files: Sequence<File>,
-  private val json: Json,
-  private val valueSerializer: KSerializer<T>
+  valueSerializer: KSerializer<T>
 ) : Iterator<T> {
-  private var fileIter = files.iterator()
+  private var filesIter = FilesIterator(files, ListSerializer(ListSerializer(valueSerializer)))
   private var listIter: Iterator<List<T>>? = null
   private var valueIter: Iterator<T>? = null
 
@@ -38,10 +36,8 @@ open class FilesListIterator<T>(
   }
 
   private fun resetIterators() {
-    if (fileIter.hasNext()) {
-      val file = fileIter.next()
-      val serializer = ListSerializer(ListSerializer(valueSerializer))
-      val listOfList = json.decodeFromString(serializer, file.readText())
+    if (filesIter.hasNext()) {
+      val listOfList = filesIter.next()
       // assume files not empty
       listIter = listOfList.iterator()
       resetValueIterator()

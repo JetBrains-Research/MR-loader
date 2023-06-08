@@ -1,18 +1,18 @@
 package loader.gerrit.iterators
 
+import client.ClientGerritREST
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.json.Json
 import java.io.File
 
-open class FilesValueIterator<T>(
+open class FilesIdToValueIterator<T>(
   files: Sequence<File>,
-  private val json: Json,
-  private val valueSerializer: KSerializer<T>
+  valueSerializer: KSerializer<T>
 ) : Iterator<T> {
-  private var fileIter = files.iterator()
+  private val filesIter = FilesIterator(files, MapSerializer(Int.serializer(), valueSerializer))
   private var valueIter: Iterator<T>? = null
+  private val json = ClientGerritREST.json
 
   override fun next(): T {
     return valueIter!!.next()
@@ -25,10 +25,8 @@ open class FilesValueIterator<T>(
 
   private fun checkAndSetIterators() {
     if (valueIteratorIsFinished()) {
-      if (fileIter.hasNext()) {
-        val file = fileIter.next()
-        val serializer = MapSerializer(Int.serializer(), valueSerializer)
-        valueIter = json.decodeFromString(serializer, file.readText()).values.iterator()
+      if (filesIter.hasNext()) {
+        valueIter = filesIter.next().values.iterator()
       }
     }
   }
