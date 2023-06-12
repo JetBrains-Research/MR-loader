@@ -1,7 +1,6 @@
 package loader.gerrit
 
 import client.ClientGerritREST
-import client.ClientUtil
 import entity.rest.gerrit.ChangeGerrit
 import entity.rest.gerrit.ChangeMetaData
 import entity.rest.gerrit.CommentsREST
@@ -23,6 +22,17 @@ import java.util.logging.FileHandler
 import java.util.logging.Logger
 import java.util.logging.SimpleFormatter
 
+@Serializable
+private data class Parameters(
+  val baseUrl: String
+)
+
+@Serializable
+private data class StateOfLoad(
+  val parameters: Parameters,
+  var finishedLoadingChanges: Boolean = false,
+  var finishedLoadingComments: Boolean = false
+)
 
 class LoaderChanges(
   val baseUrl: String,
@@ -53,18 +63,6 @@ class LoaderChanges(
     }
   }
 
-  @Serializable
-  private data class Parameters(
-    val baseUrl: String
-  )
-
-  @Serializable
-  private data class StateOfLoad(
-    val parameters: Parameters,
-    var finishedLoadingChanges: Boolean = false,
-    var finishedLoadingComments: Boolean = false
-  )
-
   private val resultsDir = run {
     val folderName = baseUrlToDomain(baseUrl)
     if (resultDir == null) File("./GerritResults/$folderName") else File(resultDir, folderName)
@@ -78,7 +76,6 @@ class LoaderChanges(
   private val stateOfLoadFile = File(resultDir, "state")
 
   private val client = ClientGerritREST()
-  private val dateFormatter = ClientUtil.getDateFormatterGetter()
 
   private val stateOfLoad = run {
     val default = StateOfLoad(
@@ -87,8 +84,9 @@ class LoaderChanges(
       )
     )
     return@run if (stateOfLoadFile.exists()) {
-      val prevState = json.decodeFromString<StateOfLoad>(stateOfLoadFile.readText())
-      if (prevState.parameters != default.parameters) default else prevState
+//      val prevState = json.decodeFromString<StateOfLoad>(stateOfLoadFile.readText())
+//      if (prevState.parameters != default.parameters) default else prevState
+      default
     } else default
 
   }
@@ -103,7 +101,8 @@ class LoaderChanges(
     errorsCommentsDir.mkdirs()
     saveState()
 
-    val maxChange = findMax()?.number ?: throw Throwable("There is no max change.")
+//    val maxChange = findMax()?.number ?: throw Throwable("There is no max change.")
+    val maxChange = 1000
 
     val threadPool = Executors.newFixedThreadPool(numOfThreads)
 
@@ -191,21 +190,10 @@ class LoaderChanges(
     logger.info("Added $count change loading tasks.")
   }
 
-  // TODO: rewrite it, to sorted order comments loading with mutable maps inside. In this case there will be max 2 maps.
-  private fun commentsMap(): HashMap<Int, CommentsREST> {
-    val files = loadedCommentsFiles()
-    val map = HashMap<Int, CommentsREST>()
-    for (file in files) {
-      val comments = decodeComments(file.readText())
-      map.putAll(comments)
-    }
-    return map
-  }
-
   fun processChanges(processChanges: (ChangeGerrit, CommentsREST?) -> Unit) {
     logger.warning("Start processing changes.")
     val files = loadedChangeFiles()
-    val commentsMap = commentsMap()
+    val commentsLoader = CommentsLoader(loadedCommentsFiles())
     val changeIds = mutableSetOf<Int>()
     for (file in files) {
       val changesMap = decodeRawJson<Map<Int, ChangeGerrit>>(file.readText())
@@ -220,8 +208,8 @@ class LoaderChanges(
         }
         changeIds.add(changeId)
 
-        val comments = commentsMap[changeId]
-        if (change.totalCommentCount > 0 && comments == null) throw Exception("Can't find comments for ${change.number}")
+        val comments = commentsLoader.get(changeId)
+        if (change.totalCommentCount > 0) throw Exception("Can't find comments for ${change.number}")
         processChanges(change, comments)
       }
       logger.info("Finished changes from ${file.name} file")
