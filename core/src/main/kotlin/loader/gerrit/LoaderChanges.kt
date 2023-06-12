@@ -74,24 +74,21 @@ class LoaderChanges(
   private val errorsChangesDir = File(errorsDir, "changes")
   private val errorsCommentsDir = File(errorsDir, "comments")
   private val stateOfLoadFile = File(resultDir, "state")
-
   private val client = ClientGerritREST()
+  private val json = ClientGerritREST.json
+  private val stateOfLoad: StateOfLoad
 
-  private val stateOfLoad = run {
+  init {
     val default = StateOfLoad(
       Parameters(
         baseUrl
       )
     )
-    return@run if (stateOfLoadFile.exists()) {
-//      val prevState = json.decodeFromString<StateOfLoad>(stateOfLoadFile.readText())
-//      if (prevState.parameters != default.parameters) default else prevState
-      default
+    stateOfLoad = if (stateOfLoadFile.exists()) {
+      val prevState = json.decodeFromString<StateOfLoad>(stateOfLoadFile.readText())
+      if (prevState.parameters != default.parameters) default else prevState
     } else default
-
   }
-
-  private val json = ClientGerritREST.json
 
   suspend fun loadByIds() {
     changesDir.mkdirs()
