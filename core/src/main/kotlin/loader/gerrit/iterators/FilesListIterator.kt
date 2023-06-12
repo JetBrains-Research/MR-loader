@@ -36,11 +36,13 @@ open class FilesListIterator<T>(
   }
 
   private fun resetIterators() {
-    if (filesIter.hasNext()) {
+    while (filesIter.hasNext()) {
       val listOfList = filesIter.next()
-      // assume files not empty
+      if (listOfList.isEmpty()) continue
+
       listIter = listOfList.iterator()
       resetValueIterator()
+      return
     }
   }
 

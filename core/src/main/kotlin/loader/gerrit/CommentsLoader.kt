@@ -8,7 +8,7 @@ class CommentsLoader(files: Sequence<File>) {
   private val loadedComments = mutableListOf<MutableMap<Int, CommentsREST>>()
   private val commentsFilesIterator = CommentsFilesIterator(files)
 
-  fun get(id: Int): CommentsREST {
+  fun get(id: Int): CommentsREST? {
     val iteratorLoadedComments = loadedComments.iterator()
     while (iteratorLoadedComments.hasNext()) {
       val loaded = iteratorLoadedComments.next()
@@ -25,7 +25,7 @@ class CommentsLoader(files: Sequence<File>) {
       value?.let { return it }
     }
 
-    throw Exception("There is no comments for id:${id}")
+    return null
   }
 
 }
