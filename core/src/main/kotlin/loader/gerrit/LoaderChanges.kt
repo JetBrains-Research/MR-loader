@@ -101,8 +101,7 @@ class LoaderChanges(
     errorsCommentsDir.mkdirs()
     saveState()
 
-//    val maxChange = findMax()?.number ?: throw Throwable("There is no max change.")
-    val maxChange = 1000
+    val maxChange = findMax()?.number ?: throw Throwable("There is no max change.")
 
     val threadPool = Executors.newFixedThreadPool(numOfThreads)
 
