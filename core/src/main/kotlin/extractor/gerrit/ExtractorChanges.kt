@@ -8,7 +8,6 @@ import extractor.gerrit.WriterCSV.TypeCSV
 import loader.gerrit.LoaderChanges
 import loader.gerrit.LoaderChanges.Companion.baseUrlToDomain
 import java.io.File
-import java.util.*
 
 
 class ExtractorChanges(
@@ -29,11 +28,9 @@ class ExtractorChanges(
 
   suspend fun run(
     ignoreLoad: Boolean = false,
-    beforeThreshold: Date? = null,
-    afterThreshold: Date? = null,
     numOfThreads: Int = LoaderChanges.DEFAULT_NUM_THREADS
   ) {
-    val loader = LoaderChanges(baseUrl, resultDir, beforeThreshold, afterThreshold, numOfThreads = numOfThreads)
+    val loader = LoaderChanges(baseUrl, resultDir, numOfThreads = numOfThreads)
     if (!ignoreLoad) {
       loader.loadByIds()
     }

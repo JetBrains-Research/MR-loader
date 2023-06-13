@@ -1,12 +1,10 @@
 package loader.gerrit
 
 import client.ClientGerritREST
-import client.ClientUtil
 import entity.rest.gerrit.ChangeGerrit
 import entity.rest.gerrit.ChangeMetaData
 import entity.rest.gerrit.CommentsREST
 import extractor.ExtractorUtil.getFilesIgnoreHidden
-import extractor.gerrit.JsonObjectsListBuffer
 import extractor.gerrit.JsonObjectsMapBuffer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -15,9 +13,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import loader.gerrit.iterators.ChangeFilesValueIterator
-import loader.gerrit.iterators.ChangesMetaDataFilesIterator
 import java.io.File
-import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -26,12 +22,21 @@ import java.util.logging.FileHandler
 import java.util.logging.Logger
 import java.util.logging.SimpleFormatter
 
+@Serializable
+private data class Parameters(
+  val baseUrl: String
+)
+
+@Serializable
+private data class StateOfLoad(
+  val parameters: Parameters,
+  var finishedLoadingChanges: Boolean = false,
+  var finishedLoadingComments: Boolean = false
+)
 
 class LoaderChanges(
   val baseUrl: String,
   resultDir: File? = null,
-  val beforeThreshold: Date? = null,
-  val afterThreshold: Date? = null,
   val ignoreState: Boolean = false,
   val numOfThreads: Int = DEFAULT_NUM_THREADS
 ) {
@@ -58,21 +63,6 @@ class LoaderChanges(
     }
   }
 
-  @Serializable
-  private data class Parameters(
-    val baseUrl: String,
-    val beforeThreshold: String? = null,
-    val afterThreshold: String? = null
-  )
-
-  @Serializable
-  private data class StateOfLoad(
-    val parameters: Parameters,
-    var finishedLoadingIds: Boolean = false,
-    var finishedLoadingChanges: Boolean = false,
-    var finishedLoadingComments: Boolean = false
-  )
-
   private val resultsDir = run {
     val folderName = baseUrlToDomain(baseUrl)
     if (resultDir == null) File("./GerritResults/$folderName") else File(resultDir, folderName)
@@ -84,26 +74,20 @@ class LoaderChanges(
   private val errorsChangesDir = File(errorsDir, "changes")
   private val errorsCommentsDir = File(errorsDir, "comments")
   private val stateOfLoadFile = File(resultDir, "state")
-
   private val client = ClientGerritREST()
-  private val dateFormatter = ClientUtil.getDateFormatterGetter()
+  private val json = ClientGerritREST.json
+  private val stateOfLoad: StateOfLoad
 
-  private val stateOfLoad = run {
+  init {
     val default = StateOfLoad(
       Parameters(
-        baseUrl,
-        beforeThreshold?.let {
-          dateFormatter.format(it)
-        },
-        afterThreshold?.let {
-          dateFormatter.format(it)
-        }
-      ))
-    return@run if (stateOfLoadFile.exists()) {
-      val prevState = client.json.decodeFromString<StateOfLoad>(stateOfLoadFile.readText())
+        baseUrl
+      )
+    )
+    stateOfLoad = if (stateOfLoadFile.exists()) {
+      val prevState = json.decodeFromString<StateOfLoad>(stateOfLoadFile.readText())
       if (prevState.parameters != default.parameters) default else prevState
     } else default
-
   }
 
   suspend fun loadByIds() {
@@ -114,106 +98,42 @@ class LoaderChanges(
     errorsCommentsDir.mkdirs()
     saveState()
 
-    loadNeededIds()
+    val maxChange = findMax()?.number ?: throw Throwable("There is no max change.")
 
     val threadPool = Executors.newFixedThreadPool(numOfThreads)
 
     try {
-      loadChangesByIds(threadPool, numOfThreads)
+      loadChangesByIds(maxChange, threadPool, numOfThreads)
       loadComments(threadPool, numOfThreads)
     } finally {
       threadPool.shutdown()
     }
   }
 
-  private suspend fun loadNeededIds() {
-    if (stateOfLoad.finishedLoadingIds && !ignoreState) return
-
-    val projects =
-      wrapIgnoringErrors(msg = "Loading projects for url=$baseUrl") { client.getProjects(baseUrl) } ?: return
-    logger.info("Number of projects: ${projects.size}")
-    val jsonObjectsListBuffer = JsonObjectsListBuffer(lightChangesDir)
-
-    for (project in projects) {
-      if (project in IGNORE_PROJECTS) continue
-      for (status in setOf("open", "abandoned", "merged")) {
-        var moreChanges = true
-        var offset = 0
-        val before = beforeThreshold?.let { dateFormatter.format(it) }
-        while (moreChanges) {
-          Thread.sleep(TIMEOUT)
-          var parameterString = "project=$project; status=$status; offset=$offset; before=$before; "
-          val rawJson =
-            wrapIgnoringErrors(msg = "Loading light changes $parameterString") {
-              client.getChangesRawLight(
-                baseUrl,
-                project,
-                status,
-                offset,
-                before
-              )
-            } ?: break
-
-          val metaData = decodeChangesMetaData(rawJson)
-          if (metaData.isEmpty()) {
-            logger.warning("Got empty list of changes for $parameterString")
-            break
-          }
-          parameterString += "size=${metaData.size}; "
-
-          if (!isInThresholds(metaData, rawJson, jsonObjectsListBuffer, parameterString)) break
-
-          val lastChange = metaData.last()
-          jsonObjectsListBuffer.addObject(rawJson)
-          moreChanges = lastChange.moreChanges ?: false
-          offset += metaData.size
-
-          logger.info("Loaded changes for $parameterString moreChanges=$moreChanges")
-        }
-      }
-    }
-    jsonObjectsListBuffer.close()
-    stateOfLoad.finishedLoadingIds = true
-    saveState()
-    logger.info("Finished light load of changes.")
+  private suspend fun findMax(): ChangeMetaData? {
+    val rawBatch = wrapIgnoringErrors(msg = "Loading first batch of light changes url=$baseUrl") {
+      client.getChangesRawLightNew(
+        baseUrl,
+        0
+      )
+    } ?: return null
+    val batch = decodeChangesMetaData(rawBatch)
+    return batch.maxByOrNull { it.number }
   }
 
-  private fun isInThresholds(
-    metaData: List<ChangeMetaData>,
-    rawJson: String,
-    jsonObjectsListBuffer: JsonObjectsListBuffer,
-    parameterString: String
-  ): Boolean {
-    val lastChange = metaData.last()
-    if (afterThreshold != null) {
-      val lastDate = dateFormatter.parse(lastChange.updated)
-      if (lastDate <= afterThreshold) {
-        val firstChange = metaData.first()
-        val firstDate = dateFormatter.parse(firstChange.updated)
-        if (firstDate <= afterThreshold) {
-          logger.info("Skipping load for $parameterString not in threshold firstDate=$firstDate; lastDate=$lastDate")
-          return false
-        }
-        jsonObjectsListBuffer.addObject(rawJson)
-        logger.info("Loaded changes for $parameterString firstDate=$firstDate; lastDate=$lastDate ")
-        return false
-      }
-    }
-    return true
-  }
-
-  private suspend fun loadChangesByIds(threadPool: ExecutorService, nThreads: Int) {
+  private suspend fun loadChangesByIds(maxId: Int, threadPool: ExecutorService, nThreads: Int) {
     if (stateOfLoad.finishedLoadingChanges && !ignoreState) return
 
     val futures = mutableListOf<Future<Boolean>>()
     val jsonObjectBuffer = JsonObjectsMapBuffer(changesDir)
-    val iter = ChangesMetaDataFilesIterator(getFilesIgnoreHidden(lightChangesDir), client.json)
+    val iter = (0..maxId).iterator()
     val loadedIds = if (ignoreState) null else loadedChangeIds()
-    addLoadSingleChange(futures, iter, jsonObjectBuffer, threadPool, nThreads, loadedIds)
     try {
-      wrapThreadPool(futures) {
-        addLoadSingleChange(futures, iter, jsonObjectBuffer, threadPool, it.size, loadedIds)
+      while (iter.hasNext()) {
+        addLoadSingleChange(futures, iter, jsonObjectBuffer, threadPool, nThreads, loadedIds)
+        wrapThreadPool(futures) {}
       }
+      wrapThreadPool(futures) {}
     } finally {
       jsonObjectBuffer.close()
     }
@@ -224,7 +144,7 @@ class LoaderChanges(
 
   private fun loadedChangeIds(): Set<Int> {
     val ids = mutableSetOf<Int>()
-    val changeFilesValueIterator = ChangeFilesValueIterator(loadedChangeFiles(), client.json)
+    val changeFilesValueIterator = ChangeFilesValueIterator(loadedChangeFiles())
     while (changeFilesValueIterator.hasNext()) {
       val change = changeFilesValueIterator.next()
       ids.add(change.number)
@@ -234,7 +154,7 @@ class LoaderChanges(
 
   private fun addLoadSingleChange(
     futures: MutableList<Future<Boolean>>,
-    idsIterator: ChangesMetaDataFilesIterator,
+    idsIterator: Iterator<Int>,
     jsonObjectBuffer: JsonObjectsMapBuffer,
     threadPool: ExecutorService,
     numOfTasks: Int,
@@ -243,16 +163,10 @@ class LoaderChanges(
     var count = 0
     while (count != numOfTasks) {
       if (idsIterator.hasNext()) {
-        val metaData = idsIterator.next()
-        val id = metaData.number
+        val id = idsIterator.next()
 
         if (loadedIds != null && id in loadedIds) {
           logger.info("Already got change: $id. Skipping.")
-          continue
-        }
-
-        if (!changeInThresholds(metaData)) {
-          logger.info("Change $id not in thresholds. Skipping.")
           continue
         }
 
@@ -272,33 +186,10 @@ class LoaderChanges(
     logger.info("Added $count change loading tasks.")
   }
 
-  private fun changeInThresholds(change: ChangeMetaData): Boolean {
-    var result = true
-    val date = dateFormatter.parse(change.updated)
-    beforeThreshold?.let {
-      if (date >= it) result = false
-    }
-    afterThreshold?.let {
-      if (date <= it) result = false
-    }
-    return result
-  }
-
-  // TODO: rewrite it, to sorted order comments loading with mutable maps inside. In this case there will be max 2 maps.
-  private fun commentsMap(): HashMap<Int, CommentsREST> {
-    val files = loadedCommentsFiles()
-    val map = HashMap<Int, CommentsREST>()
-    for (file in files) {
-      val comments = decodeComments(file.readText())
-      map.putAll(comments)
-    }
-    return map
-  }
-
   fun processChanges(processChanges: (ChangeGerrit, CommentsREST?) -> Unit) {
     logger.warning("Start processing changes.")
     val files = loadedChangeFiles()
-    val commentsMap = commentsMap()
+    val commentsLoader = CommentsLoader(loadedCommentsFiles())
     val changeIds = mutableSetOf<Int>()
     for (file in files) {
       val changesMap = decodeRawJson<Map<Int, ChangeGerrit>>(file.readText())
@@ -307,29 +198,13 @@ class LoaderChanges(
 
         if (id != change.number) throw Exception("request id: $id != loaded id : $changeId")
 
-        if (beforeThreshold != null) {
-          val date = dateFormatter.parse(change.updated)
-          if (date > beforeThreshold) {
-            logger.warning("Change $changeId > beforeThreshold")
-            continue
-          }
-        }
-
-        if (afterThreshold != null) {
-          val date = dateFormatter.parse(change.updated)
-          if (date < afterThreshold) {
-            logger.warning("Change $changeId > afterThreshold")
-            continue
-          }
-        }
-
         if (changeId in changeIds) {
           logger.warning("Got copy change $changeId")
           continue
         }
         changeIds.add(changeId)
 
-        val comments = commentsMap[changeId]
+        val comments = commentsLoader.get(changeId)
         if (change.totalCommentCount > 0 && comments == null) logger.severe("Can't find comments for ${change.number}")
         processChanges(change, comments)
       }
@@ -347,18 +222,27 @@ class LoaderChanges(
       try {
         return task()
       } catch (e: Throwable) {
-        if (e.message?.contains("429") == true) {
-          logger.warning("$msg : Error message contains 429 going sleep for 1 minute.")
-          Thread.sleep(60_000)
-          continue
+        val errMsg = e.message ?: "Error message is empty"
+        when {
+          errMsg.contains("404") -> {
+            logger.warning("$msg : Skipping. Error message contains 404.")
+            return null
+          }
+
+          errMsg.contains("429") -> {
+            logger.warning("$msg : Sleep for 1 minute. Error message contains 429.")
+            Thread.sleep(60_000)
+            continue
+          }
+
+          numOfErrors > maxNumOfErrors -> {
+            logger.severe("Number of errors for task exceeded threshold=$maxNumOfErrors : $msg : $errMsg")
+            return null
+          }
         }
 
-        if (numOfErrors > maxNumOfErrors) {
-          logger.severe("Number of errors for task exceeded threshold=$maxNumOfErrors : $msg : ${e.message}")
-          return null
-        }
         numOfErrors += 1
-        logger.warning("Got error : $msg : ${e.message}")
+        logger.warning("Got error : $msg : $errMsg")
       }
     }
   }
@@ -369,7 +253,7 @@ class LoaderChanges(
 
   private fun decodeChangesMetaData(rawJson: String) = decodeRawJson<List<ChangeMetaData>>(rawJson)
 
-  private inline fun <reified T> decodeRawJson(rawJson: String) = client.json.decodeFromString<T>(rawJson)
+  private inline fun <reified T> decodeRawJson(rawJson: String) = json.decodeFromString<T>(rawJson)
 
   private fun decodeComments(rawJson: String) = decodeRawJson<Map<Int, CommentsREST>>(rawJson)
 
@@ -392,10 +276,9 @@ class LoaderChanges(
 
     val jsonObjectBuffer = JsonObjectsMapBuffer(commentsDir)
 
-    val changeFilesValueIterator = ChangeFilesValueIterator(loadedChangesFiles, client.json)
+    val changeFilesValueIterator = ChangeFilesValueIterator(loadedChangesFiles)
     val futures = mutableListOf<Future<Boolean>>()
     addCommentLoadTasks(futures, threadPool, changeFilesValueIterator, commentIds, jsonObjectBuffer, nThreads)
-
 
     wrapThreadPool(futures, delay = 500) {
       addCommentLoadTasks(futures, threadPool, changeFilesValueIterator, commentIds, jsonObjectBuffer, it.size)
@@ -477,5 +360,5 @@ class LoaderChanges(
     }
   }
 
-  private fun saveState() = stateOfLoadFile.writeText(client.json.encodeToString(stateOfLoad))
+  private fun saveState() = stateOfLoadFile.writeText(json.encodeToString(stateOfLoad))
 }
