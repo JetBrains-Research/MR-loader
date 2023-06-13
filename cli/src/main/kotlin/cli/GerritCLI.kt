@@ -23,7 +23,7 @@ class GerritCLI :
   private val dataDir by option("--data-dir", help = "Folder for saving results.").file().required()
   private val patchsetCommentKey by option(
     "--patchset-comment-key",
-    help = "Comments key for the whole patchset."
+    help = "Comments key for the whole patchset. By default ${ExtractorChanges.DEFAULT_PATCHSET_COMMENT_KEY}"
   ).default(ExtractorChanges.DEFAULT_PATCHSET_COMMENT_KEY)
   private val numOfThreads by option(
     "--num-of-threads",
