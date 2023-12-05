@@ -51,16 +51,18 @@ class LoaderChanges(
       .removePrefix("http://")
       .removePrefix("https://")
       .removeSuffix("/")
-
-    private val logger = run {
-      val result = Logger.getLogger("loader")
-      val fh = FileHandler("./loader.log")
-      result.addHandler(fh)
-      val formatter = SimpleFormatter()
-      fh.formatter = formatter
-      result
-    }
   }
+
+  // TODO: replace
+  private val logger = run {
+    val result = Logger.getLogger("loader")
+    val fh = FileHandler(File(resultDir, "loader.log").absolutePath)
+    result.addHandler(fh)
+    val formatter = SimpleFormatter()
+    fh.formatter = formatter
+    result
+  }
+
 
   private val changesDir = File(resultDir, "changes")
   private val commentsDir = File(resultDir, "comments")
