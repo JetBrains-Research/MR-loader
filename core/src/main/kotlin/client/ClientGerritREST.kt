@@ -2,9 +2,9 @@ package client
 
 import entity.rest.gerrit.*
 import io.ktor.client.*
-import io.ktor.client.features.*
+import io.ktor.client.call.*
+import io.ktor.client.plugins.*
 import io.ktor.client.request.*
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
 class ClientGerritREST {
@@ -31,7 +31,8 @@ class ClientGerritREST {
     }
   }
 
-  suspend fun requestRaw(urlString: String) = client.request<String>(urlString).removePrefix(START_RESPONSE)
+  suspend fun requestRaw(urlString: String) = client.request(urlString).body<String>().removePrefix(START_RESPONSE)
+
   private suspend inline fun <reified T> request(urlString: String): T = json.decodeFromString(requestRaw(urlString))
 
   suspend fun getUserAccount(baseUrl: String, accountId: Int) =

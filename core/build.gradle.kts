@@ -1,15 +1,13 @@
 plugins {
-  kotlin("jvm")
-  kotlin("plugin.serialization")
-  application
+  kotlin("jvm") version "1.9.21"
+  id("io.ktor.plugin") version "2.2.4"
+  kotlin("plugin.serialization").version("1.9.21")
 }
 
-group = "me.user"
-version = "1.0-SNAPSHOT"
+group = "org.jetbrains.research.ictl"
+version = "0.0.1"
 
-val ktorVersion = "1.6.7"
-val spaceUsername: String by project
-val spacePassword: String by project
+val ktorVersion = "2.2.4"
 
 repositories {
   mavenCentral()
@@ -18,16 +16,12 @@ repositories {
 dependencies {
   implementation("io.ktor:ktor-client-core:$ktorVersion")
   implementation("io.ktor:ktor-client-apache:$ktorVersion")
-
-  implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
+  implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
+  implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
 
   testImplementation(kotlin("test"))
 }
 
 tasks.test {
   useJUnitPlatform()
-}
-
-application {
-  mainClass.set("MainKt")
 }

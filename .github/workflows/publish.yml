@@ -1,0 +1,25 @@
+name: Publish Docker image
+on:
+  workflow_run:
+    workflows: [ "Java CI with Gradle" ]
+    branches: [ main ]
+    types:
+      - completed
+jobs:
+  publish-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Build Docker container and publish to GitHub Packages
+        env:
+          CI: "" # disable eslint
+        run: |
+          ./gradlew jib \
+            -Djib.to.auth.username=${{ github.actor }} \
+            -Djib.to.auth.password=${{ github.token }} \
+            -Djib.from.platforms=linux/amd64,linux/arm64

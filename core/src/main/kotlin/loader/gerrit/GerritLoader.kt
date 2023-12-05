@@ -1,41 +1,47 @@
-package extractor.gerrit
+package loader.gerrit
 
 import client.ClientUtil
+import entity.rest.gerrit.Change
 import entity.rest.gerrit.ChangeGerrit
 import entity.rest.gerrit.CommentsREST
 import entity.rest.gerrit.UserAccountGerrit
+import extractor.ExtractorUtil
+import extractor.gerrit.WriterCSV
 import extractor.gerrit.WriterCSV.TypeCSV
-import loader.gerrit.LoaderChanges
+import extractor.gerrit.WriterProvider
 import loader.gerrit.LoaderChanges.Companion.baseUrlToDomain
+import loader.gerrit.iterators.ChangeFilesValueIterator
+import loader.gerrit.iterators.ChangesMetaDataFilesIterator
+import org.slf4j.LoggerFactory
 import java.io.File
+import java.util.*
 
 
-class ExtractorChanges(
+class GerritLoader(
   val baseUrl: String,
-  val resultDir: File? = null,
+  val resultsDir: File,
   val patchsetCommentKey: String = DEFAULT_PATCHSET_COMMENT_KEY
 ) {
 
   companion object {
     const val DEFAULT_PATCHSET_COMMENT_KEY = "/PATCHSET_LEVEL"
+    private val log = LoggerFactory.getLogger(GerritLoader::class.java)
   }
 
-  private val resultsFolder = run {
-    val folder = baseUrlToDomain(baseUrl)
-    if (resultDir == null) File("./dataset/gerrit/$folder") else File(resultDir, "dataset/$folder")
-  }
+  private val datasetUrlDir =
+    File(resultsDir, "dataset/gerrit/${baseUrlToDomain(baseUrl)}")
   private val writerProvider = WriterProvider()
+  private val urlDir = File(resultsDir, "changes/gerrit/${baseUrlToDomain(baseUrl)}")
 
   suspend fun run(
     ignoreLoad: Boolean = false,
     numOfThreads: Int = LoaderChanges.DEFAULT_NUM_THREADS
   ) {
-    val loader = LoaderChanges(baseUrl, resultDir, numOfThreads = numOfThreads)
+    val loader = LoaderChanges(baseUrl, urlDir, numOfThreads = numOfThreads)
     if (!ignoreLoad) {
       loader.loadByIds()
     }
-    resultsFolder.mkdirs()
-
+    datasetUrlDir.mkdirs()
 
     loader.processChanges { changeGerrit, comments ->
       addLineChanges(changeGerrit)
@@ -54,7 +60,7 @@ class ExtractorChanges(
     writerProvider.writeAllAndClose()
   }
 
-  private fun resultFile(key: String, project: String) = File(resultsFolder, "$key/${project}.csv")
+  private fun resultFile(key: String, project: String) = File(datasetUrlDir, "$key/${project}.csv")
 
   private fun getWriter(project: String, type: TypeCSV, file: File) = writerProvider.getWriter(project, type, file)
 
@@ -255,4 +261,50 @@ class ExtractorChanges(
   }
 
   private fun addCommas(value: String) = "\"$value\""
+
+  fun checkLoadedData() {
+    val lightIds = loadLightChanges(urlDir)
+    val loadedChanges = loadChanges(urlDir)
+    val diff = lightIds - loadedChanges
+    if (diff.isNotEmpty()) {
+      log.info("Not loaded: ${diff.size}")
+      log.info(diff.toString())
+    }
+  }
+
+  private fun loadLightChanges(resultsDir: File): Set<Int> {
+    val lightChangesIterator =
+      ChangesMetaDataFilesIterator(ExtractorUtil.getFilesIgnoreHidden(File(resultsDir, "light_changes")))
+    log.info("Checking loaded light changes.")
+    return loadedChanges(lightChangesIterator)
+  }
+
+  private fun loadChanges(resultsDir: File): Set<Int> {
+    val changesIterator =
+      ChangeFilesValueIterator(ExtractorUtil.getFilesIgnoreHidden(File(resultsDir, "changes")))
+    log.info("Checking loaded changes.")
+    return loadedChanges(changesIterator)
+  }
+
+  private fun loadedChanges(changesIterator: Iterator<Change>): MutableSet<Int> {
+    val dateFormatter = ClientUtil.getDateFormatterGetter()
+    var minUpdated: Date? = null
+    var maxUpdated: Date? = null
+    val loadedChanges = mutableSetOf<Int>()
+    var loadedChangesCopies = 0
+    while (changesIterator.hasNext()) {
+      val change = changesIterator.next()
+      if (!loadedChanges.add(change.number)) loadedChangesCopies++
+      val updatedDate = dateFormatter.parse(change.updated)
+      if (minUpdated == null) minUpdated = updatedDate else {
+        if (minUpdated > updatedDate) minUpdated = updatedDate
+      }
+
+      if (maxUpdated == null) maxUpdated = updatedDate else {
+        if (maxUpdated < updatedDate) maxUpdated = updatedDate
+      }
+    }
+    log.info("Loaded: ${loadedChanges.size}; Copies: $loadedChangesCopies; minUpdated: $minUpdated; maxUpdated: $maxUpdated")
+    return loadedChanges
+  }
 }

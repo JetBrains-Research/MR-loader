@@ -10,7 +10,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import loader.gerrit.iterators.ChangeFilesValueIterator
 import java.io.File
@@ -36,7 +35,7 @@ private data class StateOfLoad(
 
 class LoaderChanges(
   val baseUrl: String,
-  resultDir: File? = null,
+  val resultDir: File,
   val ignoreState: Boolean = false,
   val numOfThreads: Int = DEFAULT_NUM_THREADS
 ) {
@@ -63,14 +62,10 @@ class LoaderChanges(
     }
   }
 
-  private val resultsDir = run {
-    val folderName = baseUrlToDomain(baseUrl)
-    if (resultDir == null) File("./GerritResults/$folderName") else File(resultDir, folderName)
-  }
-  private val changesDir = File(resultsDir, "changes")
-  private val commentsDir = File(resultsDir, "comments")
-  private val lightChangesDir = File(resultsDir, "light_changes")
-  private val errorsDir = File(resultsDir, "errors")
+  private val changesDir = File(resultDir, "changes")
+  private val commentsDir = File(resultDir, "comments")
+  private val lightChangesDir = File(resultDir, "light_changes")
+  private val errorsDir = File(resultDir, "errors")
   private val errorsChangesDir = File(errorsDir, "changes")
   private val errorsCommentsDir = File(errorsDir, "comments")
   private val stateOfLoadFile = File(resultDir, "state")

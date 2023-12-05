@@ -1,12 +1,12 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
+val version = "0.0.1"
 
 plugins {
-    kotlin("jvm")
-    kotlin("plugin.serialization")
-    id("com.github.johnrengelman.shadow") version "7.0.0"
+    kotlin("jvm") version "1.9.21"
     id("application")
+    id("com.github.johnrengelman.shadow") version "8.1.1"
+    id("com.google.cloud.tools.jib") version "3.4.0"
 }
 
 tasks {
@@ -14,40 +14,40 @@ tasks {
         archiveBaseName.set("shadow")
         mergeServiceFiles()
         manifest {
-            attributes(mapOf("Main-Class" to "cli.CLI"))
+            attributes(mapOf("Main-Class" to "cli.ShadowJarCLI"))
         }
     }
-}
 
-tasks {
-    build {
-        dependsOn(shadowJar)
+    jib {
+        from {
+            image = "maven:3.9.0-eclipse-temurin-17"
+
+            platforms {
+                platform {
+                    architecture = if (System.getProperty("os.arch").equals("aarch64")) "arm64" else "amd64"
+                    os = "linux"
+                }
+            }
+        }
+        to {
+            image = "ghcr.io/jetbrains-research/mr-loader/${rootProject.name}:$version"
+            tags = setOf("latest", version)
+        }
     }
+
 }
 
 application {
-    mainClassName = "cli.CLIKt"
+    mainClass.set("cli.ShadowJarCLIKt")
 }
 
-tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "1.8"
-}
 
 dependencies {
     implementation(project(":core"))
-    implementation("com.github.ajalt.clikt:clikt:3.5.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
+    implementation("com.github.ajalt.clikt:clikt:4.2.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0-RC")
 }
 
 repositories {
     mavenCentral()
-}
-
-val compileKotlin: KotlinCompile by tasks
-compileKotlin.kotlinOptions {
-    jvmTarget = "1.8"
-}
-val compileTestKotlin: KotlinCompile by tasks
-compileTestKotlin.kotlinOptions {
-    jvmTarget = "1.8"
 }
