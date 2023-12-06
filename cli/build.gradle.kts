@@ -1,23 +1,12 @@
-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
-
 val version = "0.0.1"
 
 plugins {
     kotlin("jvm") version "1.9.21"
     id("application")
-    id("com.github.johnrengelman.shadow") version "8.1.1"
     id("com.google.cloud.tools.jib") version "3.4.0"
 }
 
 tasks {
-    named<ShadowJar>("shadowJar") {
-        archiveBaseName.set("shadow")
-        mergeServiceFiles()
-        manifest {
-            attributes(mapOf("Main-Class" to "cli.ShadowJarCLI"))
-        }
-    }
-
     jib {
         from {
             image = "maven:3.9.0-eclipse-temurin-17"
@@ -38,7 +27,7 @@ tasks {
 }
 
 application {
-    mainClass.set("cli.ShadowJarCLIKt")
+    mainClass.set("cli.DockerCLIKt")
 }
 
 
