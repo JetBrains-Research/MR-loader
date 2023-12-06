@@ -46,6 +46,9 @@ class LoaderChanges(
 
     // TODO: needs check
     private val IGNORE_PROJECTS = setOf("All-Projects", "All-Users")
+    private const val NOT_FOUND = "Not found:"
+    private const val DESERIALIZE_ERROR =
+      "Deserialize error : There seems to be a change in response from the server side. Please report."
 
     fun baseUrlToDomain(baseUrl: String) = baseUrl
       .removePrefix("http://")
@@ -56,6 +59,7 @@ class LoaderChanges(
   // TODO: replace
   private val logger = run {
     val result = Logger.getLogger("loader")
+    resultDir.mkdirs()
     val fh = FileHandler(File(resultDir, "loader.log").absolutePath)
     result.addHandler(fh)
     val formatter = SimpleFormatter()
@@ -169,7 +173,19 @@ class LoaderChanges(
 
         val callable = Callable {
           runBlocking {
-            wrapIgnoringErrors { client.getChangeRaw(baseUrl, id) }?.let { rawJson ->
+            wrapIgnoringErrors {
+              val rawJson = client.getChangeRaw(baseUrl, id)
+
+              if (rawJson.startsWith(NOT_FOUND)) {
+                throw Exception(rawJson)
+              }
+
+              try {
+                decodeRawJson<ChangeMetaData>(rawJson)
+              } catch (e: Exception) {
+                throw Exception("$DESERIALIZE_ERROR : ChangeId $id")
+              }
+
               jsonObjectBuffer.addEntry(rawJson, id)
             }
             logger.info("Loaded changes for $id")
@@ -230,6 +246,16 @@ class LoaderChanges(
             logger.warning("$msg : Sleep for 1 minute. Error message contains 429.")
             Thread.sleep(60_000)
             continue
+          }
+
+          errMsg.contains(NOT_FOUND) -> {
+            logger.warning(errMsg)
+            return null
+          }
+
+          errMsg.contains(DESERIALIZE_ERROR) -> {
+            logger.severe("$DESERIALIZE_ERROR : $msg")
+            return null
           }
 
           numOfErrors > maxNumOfErrors -> {

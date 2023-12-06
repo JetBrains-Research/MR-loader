@@ -1,10 +1,9 @@
-val version = "0.0.1"
-
 plugins {
-    kotlin("jvm") version "1.9.21"
     id("application")
     id("com.google.cloud.tools.jib") version "3.4.0"
 }
+
+val projectVersion = version as String
 
 tasks {
     jib {
@@ -22,8 +21,8 @@ tasks {
             }
         }
         to {
-            image = "ghcr.io/jetbrains-research/mr-loader/${rootProject.name}:$version"
-            tags = setOf("latest", version)
+            image = "ghcr.io/jetbrains-research/mr-loader/${rootProject.name}:$projectVersion"
+            tags = setOf("latest", projectVersion)
         }
     }
 

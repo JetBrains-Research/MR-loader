@@ -1,11 +1,7 @@
 plugins {
-  kotlin("jvm") version "1.9.21"
   id("io.ktor.plugin") version "2.2.4"
-  kotlin("plugin.serialization").version("1.9.21")
+  kotlin("plugin.serialization") version "1.9.21"
 }
-
-group = "org.jetbrains.research.ictl"
-version = "0.0.1"
 
 val ktorVersion = "2.2.4"
 
