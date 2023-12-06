@@ -8,6 +8,9 @@ plugins {
 
 tasks {
     jib {
+        container {
+            mainClass = "cli.DockerCLIKt"
+        }
         from {
             image = "maven:3.9.0-eclipse-temurin-17"
 
