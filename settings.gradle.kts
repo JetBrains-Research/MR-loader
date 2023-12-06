@@ -1,4 +1,4 @@
-rootProject.name = "MR-loader"
+rootProject.name = "mr-loader"
 include("core", "cli")
 
 pluginManagement {
