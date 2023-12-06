@@ -16,7 +16,7 @@ jobs:
         env:
           CI: "" # disable eslint
         run: |
-          ./gradlew jib \
+          ./gradlew :cli:jib \
             -Djib.to.auth.username=${{ github.actor }} \
             -Djib.to.auth.password=${{ github.token }} \
             -Djib.from.platforms=linux/amd64,linux/arm64
