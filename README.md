@@ -1,14 +1,14 @@
 # MR-loader
 
 > [!IMPORTANT]  
-> Tool is fully dependent on server response. Servers may differ and changed overtime.
+> Tool is fully dependent on server response. Servers may differ and change overtime.
 > If you encounter errors in results, please report.
 
 Tool for loading merge requests from Gerrit. Github functionality will be added later.
 
 MR-loader workflow:
 
-* Identify `maxId` (the largest existing ID number of pull request). It's done by requesting a batch of most recent pull
+* Identify `maxId` (the largest existing ID number of pull requests). It's done by requesting a batch of the most recent pull
   requests.
 * Iterate over all integers until `maxID` and send the requests via REST API to load all required information of code
   changes with the specified ID.
@@ -16,7 +16,7 @@ MR-loader workflow:
   following structure `map[changeID] = jsonResponse`.
 * Iterate over all loaded changes in `work_dir/gerrit/url_dir/changes` and load comments if needed
   to `work_dir/gerrit/url_dir/comments`.
-  Files in `work_dir/gerrit/url_dir/comments` include map with following structure `map[changeID] = jsonResponse`.
+  Files in `work_dir/gerrit/url_dir/comments` include a map with the following structure `map[changeID] = jsonResponse`.
 * Iterate over all loaded changes in `work_dir/gerrit/url_dir/changes` and comments
   in `work_dir/gerrit/url_dir/comments` to create a dataset in
   `work_dir/dataset/gerrit/`
@@ -27,7 +27,7 @@ MR-loader workflow:
 
 You can use tool as CLI via docker.
 
-First choose working folder for storing all the results. You can set it via mounting volume to `/root` of docker
+First, choose a working folder for storing all the results. You can set it via mounting volume to `/root` of docker
 container
 `--volume ~/your/folder/path:/root`. After you need to call the `GerritLoad` command with arguments. List of
 arguments you can get via:
@@ -54,7 +54,7 @@ Stored in `work_dir/dataset/gerrit/changes`.
 |------------|--------|----------|--------|---------|------------|--------------|---------|
 | ...        | ...    | ...      | ...    | ...     | ...        | ...          | ...     |
 
-### Changes files
+### Change’s files
 
 Stored in `work_dir/dataset/gerrit/changes_files`
 
