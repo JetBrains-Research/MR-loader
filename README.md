@@ -1,7 +1,7 @@
 # MR-loader
 
 > [!IMPORTANT]  
-> Crucial information. Tool is fully dependent on server response. Servers may differ and changed overtime.
+> Tool is fully dependent on server response. Servers may differ and changed overtime.
 > If you encounter errors in results, please report.
 
 Tool for loading merge requests from Gerrit. Github functionality will be added later.
