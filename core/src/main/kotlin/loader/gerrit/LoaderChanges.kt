@@ -243,8 +243,8 @@ class LoaderChanges(
           }
 
           errMsg.contains("429") -> {
-            logger.warning("$msg : Sleep for 1 minute. Error message contains 429.")
-            Thread.sleep(60_000)
+            logger.warning("$msg : Sleep for 5 minute. Error message contains 429.")
+            Thread.sleep(5 * 60_000)
             continue
           }
 

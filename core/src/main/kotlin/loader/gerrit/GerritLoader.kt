@@ -31,7 +31,7 @@ class GerritLoader(
   private val datasetUrlDir =
     File(resultsDir, "dataset/gerrit/${baseUrlToDomain(baseUrl)}")
   private val writerProvider = WriterProvider()
-  private val urlDir = File(resultsDir, "changes/gerrit/${baseUrlToDomain(baseUrl)}")
+  private val urlDir = File(resultsDir, "gerrit/${baseUrlToDomain(baseUrl)}")
 
   suspend fun run(
     ignoreLoad: Boolean = false,
