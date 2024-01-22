@@ -13,18 +13,25 @@ import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class TestJsonObjectBuffer {
   private val tmpFolder = File("src/test/tmp/")
   private val numberOfCoroutines = 100
   private val numberOfActions = 50
 
+  @BeforeTest
+  fun prepare() {
+    tmpFolder.mkdirs()
+  }
+
+  @AfterTest
+  fun cleanup() {
+    tmpFolder.deleteRecursively()
+  }
+
   @Test
   fun testJsonObjectBufferChanges() {
-    tmpFolder.mkdirs()
     val map = massGeneration { generateChange(it) }
     assertEquals(numberOfActions * numberOfCoroutines, map.size)
 
@@ -36,12 +43,10 @@ class TestJsonObjectBuffer {
       assertEquals(generatedChange, savedChange)
     }
     assertTrue(map.isEmpty())
-    cleanup()
   }
 
   @Test
   fun testJsonObjectBufferComments() {
-    tmpFolder.mkdirs()
     val map = massGeneration { generateComments(it) }
     assertEquals(numberOfActions * numberOfCoroutines, map.size)
 
@@ -55,7 +60,6 @@ class TestJsonObjectBuffer {
       }
     }
     assertTrue(map.isEmpty())
-    cleanup()
   }
 
   private inline fun <reified T> massGeneration(
@@ -110,8 +114,6 @@ class TestJsonObjectBuffer {
       }
     }
   }
-
-  private fun cleanup() = tmpFolder.deleteRecursively()
 
   private fun generateFileCommentREST() = FileCommentREST(
     UserAccountGerrit(Random.nextInt(0, 10)),
