@@ -74,10 +74,10 @@ class TestJsonObjectBuffer {
       withContext(Dispatchers.Default) {
         massiveRun(numberOfCoroutines, numberOfActions) {
           val number = counter.incrementAndGet()
-          val generatedChange = generate(number)
-          val rawJson = Json.encodeToString(generatedChange)
+          val generatedValue = generate(number)
+          val rawJson = Json.encodeToString(generatedValue)
           jsonObjectBuffer.addEntry(rawJson, number)
-          map[number] = generatedChange
+          map[number] = generatedValue
         }
       }
     }
