@@ -77,7 +77,7 @@ class ClientGerritREST {
     return requestRaw("$baseUrl/changes/$query&S=$offset")
   }
 
-  suspend fun getChangesRawLightNew(baseUrl: String, offset: Int) =
+  suspend fun getChangesRawLight(baseUrl: String, offset: Int) =
     requestRaw("$baseUrl/changes/?S=$offset")
 
   suspend fun getChangesRawLightWithProject(

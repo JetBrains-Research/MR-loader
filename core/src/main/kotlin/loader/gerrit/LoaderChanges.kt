@@ -113,7 +113,7 @@ class LoaderChanges(
 
   private suspend fun findMax(): ChangeMetaData? {
     val rawBatch = wrapIgnoringErrors(msg = "Loading first batch of light changes url=$baseUrl") {
-      client.getChangesRawLightNew(
+      client.getChangesRawLight(
         baseUrl,
         0
       )

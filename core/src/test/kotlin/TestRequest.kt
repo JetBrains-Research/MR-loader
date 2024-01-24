@@ -19,7 +19,7 @@ class TestRequest {
 
     while (change == null) {
       val rawBatch = runBlocking {
-        client.getChangesRawLightNew(
+        client.getChangesRawLight(
           baseUrl,
           offset
         )
